@@ -16,3 +16,5 @@ npm run build
 ```
 
 A pasta `dist/` contém o site estático pronto a publicar.
+
+Your site is live at https://andre-pereira01.github.io/gestao-cimaltea/
