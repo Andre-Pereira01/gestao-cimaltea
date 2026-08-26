@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { loadFromCloud, saveToCloud } from "./supabase.js";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -527,22 +528,65 @@ function RoomsTab({ naipes, rooms, setRooms }) {
   );
 }
 
-export default function App() {
-  const [naipes, setNaipes] = useState(() => loadLocal("cimaltea-naipes", INITIAL_NAIPES));
-  const [rooms, setRooms] = useState(() => loadLocal("cimaltea-rooms", INITIAL_ROOMS));
-  const [tab, setTab] = useState("roster");
+// Hook: debounce save to Supabase (2s after last change)
+function useCloudSync(key, data) {
+  const timer = useRef(null);
+  useEffect(() => {
+    if (data === null) return;
+    saveLocal(key, data);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => saveToCloud(key, data), 2000);
+    return () => clearTimeout(timer.current);
+  }, [key, data]);
+}
 
-  useEffect(() => { saveLocal("cimaltea-naipes", naipes); }, [naipes]);
-  useEffect(() => { saveLocal("cimaltea-rooms", rooms); }, [rooms]);
+export default function App() {
+  const [naipes, setNaipes] = useState(null);
+  const [rooms, setRooms] = useState(null);
+  const [tab, setTab] = useState("roster");
+  const [syncStatus, setSyncStatus] = useState("loading");
+
+  // Load: cloud first, localStorage fallback, initial data last resort
+  useEffect(() => {
+    (async () => {
+      setSyncStatus("loading");
+      const cloudNaipes = await loadFromCloud("naipes");
+      const cloudRooms = await loadFromCloud("rooms");
+
+      if (cloudNaipes) {
+        setNaipes(cloudNaipes);
+        setRooms(cloudRooms || []);
+        saveLocal("cimaltea-naipes", cloudNaipes);
+        saveLocal("cimaltea-rooms", cloudRooms || []);
+        setSyncStatus("cloud");
+      } else {
+        setNaipes(loadLocal("cimaltea-naipes", INITIAL_NAIPES));
+        setRooms(loadLocal("cimaltea-rooms", INITIAL_ROOMS));
+        setSyncStatus("local");
+      }
+    })();
+  }, []);
+
+  useCloudSync("naipes", naipes);
+  useCloudSync("rooms", rooms);
+
+  if (!naipes || !rooms) {
+    return <div className="flex items-center justify-center h-screen text-gray-400">A carregar...</div>;
+  }
 
   const stats = getStats(naipes);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-5xl mx-auto">
-          <h1 className="text-lg font-bold text-gray-900">CIMALTEA 2026 — Gestão</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Banda Musical de Monção · 51.º Certamen Internacional de Música "Vila d'Altea"</p>
+        <div className="max-w-5xl mx-auto flex items-center gap-3">
+          <div className="flex-1">
+            <h1 className="text-lg font-bold text-gray-900">CIMALTEA 2026 — Gestão</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Banda Musical de Monção · 51.º Certamen Internacional de Música "Vila d'Altea"</p>
+          </div>
+          <span className={`text-xs px-2 py-1 rounded-full ${syncStatus === "cloud" ? "bg-emerald-100 text-emerald-700" : syncStatus === "local" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
+            {syncStatus === "cloud" ? "☁ Sincronizado" : syncStatus === "local" ? "💾 Apenas local" : "…"}
+          </span>
         </div>
       </div>
       <div className="bg-white border-b border-gray-200 px-4">
