@@ -31,25 +31,31 @@ function addFooter(doc) {
   }
 }
 
+const isOutros = (name) => name.trim().toLowerCase() === "outros";
+
 export function exportRosterPDF(naipes) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   let y = addHeader(doc, "Listagem de Músicos");
 
-  // Stats
+  const musicNaipes = naipes.filter(n => !isOutros(n.name));
+  const outrosNaipes = naipes.filter(n => isOutros(n.name));
+
+  // Stats (only musicians)
   let total = 0, conf = 0, pend = 0, ref = 0;
-  for (const n of naipes) for (const m of n.musicians) {
+  for (const n of musicNaipes) for (const m of n.musicians) {
     total++; if (m.status === "confirmado") conf++; else pend++; if (m.reforco) ref++;
   }
+  const outros = outrosNaipes.reduce((s, n) => s + n.musicians.length, 0);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text(`Total: ${total}    Confirmados: ${conf}    Pendentes: ${pend}    Reforços: ${ref}    Plantilla: ${total - ref}`, 14, y);
+  doc.text(`Músicos: ${total}    Confirmados: ${conf}    Pendentes: ${pend}    Reforços: ${ref}    Plantilla: ${total - ref}    Outros: ${outros}`, 14, y);
   y += 6;
 
-  // Build table data
+  // Musicians table
   const rows = [];
   let num = 1;
-  for (const n of naipes) {
+  for (const n of musicNaipes) {
     for (const m of n.musicians) {
       rows.push([
         num++,
@@ -92,6 +98,37 @@ export function exportRosterPDF(naipes) {
     },
     margin: { left: 14, right: 14 },
   });
+
+  // Outros section
+  const outrosMusicians = outrosNaipes.flatMap(n => n.musicians);
+  if (outrosMusicians.length > 0) {
+    let oy = doc.lastAutoTable.finalY + 8;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Outros (não músicos)", 14, oy);
+    oy += 4;
+
+    const outrosRows = outrosMusicians.map((m, i) => [
+      i + 1,
+      m.name,
+      m.status === "confirmado" ? "Confirmado" : "Pendente",
+      m.comments || "",
+    ]);
+    autoTable(doc, {
+      startY: oy,
+      head: [["N.º", "Nome", "Estado", "Observações"]],
+      body: outrosRows,
+      styles: { fontSize: 8, cellPadding: 1.5 },
+      headStyles: { fillColor: [100, 100, 100], fontStyle: "bold", fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 10, halign: "right" },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 90 },
+      },
+      margin: { left: 14, right: 14 },
+    });
+  }
 
   addFooter(doc);
   doc.save("listagem_musicos_cimaltea.pdf");

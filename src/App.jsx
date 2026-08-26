@@ -139,14 +139,19 @@ function saveLocal(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 }
 
+const isOutros = (name) => name.trim().toLowerCase() === "outros";
+
 function getStats(naipes) {
-  let total = 0, conf = 0, pend = 0, ref = 0;
-  for (const n of naipes) for (const m of n.musicians) {
-    total++;
-    if (m.status === "confirmado") conf++; else pend++;
-    if (m.reforco) ref++;
+  let total = 0, conf = 0, pend = 0, ref = 0, outros = 0;
+  for (const n of naipes) {
+    if (isOutros(n.name)) { outros += n.musicians.length; continue; }
+    for (const m of n.musicians) {
+      total++;
+      if (m.status === "confirmado") conf++; else pend++;
+      if (m.reforco) ref++;
+    }
   }
-  return { total, conf, pend, ref, plantilla: total - ref };
+  return { total, conf, pend, ref, plantilla: total - ref, outros };
 }
 
 function flatMusicians(naipes) {
@@ -311,12 +316,13 @@ function RosterTab({ naipes, setNaipes }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-        <Stat label="Total" value={stats.total} />
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <Stat label="Músicos" value={stats.total} />
         <Stat label="Confirmados" value={stats.conf} />
         <Stat label="Pendentes" value={stats.pend} />
         <Stat label="Reforços" value={stats.ref} />
         <Stat label="Plantilla" value={stats.plantilla} sub="(sem reforços)" />
+        <Stat label="Outros" value={stats.outros} sub="(não músicos)" />
       </div>
 
       <div className="flex gap-2 items-center">
