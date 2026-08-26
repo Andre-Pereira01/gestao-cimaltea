@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { loadFromCloud, saveToCloud } from "./supabase.js";
+import { exportRosterPDF, exportRoomsPDF } from "./pdf-export.js";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -325,6 +326,9 @@ function RosterTab({ naipes, setNaipes }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <button onClick={() => exportRosterPDF(naipes)} className="border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-100 whitespace-nowrap" title="Exportar PDF">
+          ↓ PDF
+        </button>
         <button onClick={() => setShowAddNaipe(true)} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap">
           + Naipe
         </button>
@@ -465,6 +469,9 @@ function RoomsTab({ naipes, rooms, setRooms }) {
           <button key={s} onClick={() => setSelectedSize(s)} className={`w-8 h-8 rounded-lg text-sm font-medium border ${selectedSize === s ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"}`}>{s}</button>
         ))}
         <button onClick={addRoom} className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 ml-2">+ Quarto</button>
+        <button onClick={() => exportRoomsPDF(naipes, rooms)} className="border border-gray-300 text-gray-600 text-sm px-3 py-1.5 rounded-lg hover:bg-gray-100 whitespace-nowrap ml-auto" title="Exportar PDF">
+          ↓ PDF
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
