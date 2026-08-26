@@ -1,7 +1,7 @@
 // ── Configuração Supabase ──
 // Substitui estes valores pelos do teu projeto Supabase (Settings → API)
-const SUPABASE_URL = 'https://XXXXXXXXXX.supabase.co';
-const SUPABASE_KEY = 'eyXXXXXXXXXXXXXXX';
+const SUPABASE_URL = 'https://mifbfbzrxtmpcmdgszyq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_bOOevfNbKYrpiEAuJ6Hu9Q_8BUfA7zk';
 
 const headers = {
   apikey: SUPABASE_KEY,
