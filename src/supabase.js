@@ -16,23 +16,38 @@ export async function loadFromCloud(id) {
       `${SUPABASE_URL}/rest/v1/app_data?id=eq.${id}&select=data`,
       { headers }
     );
-    if (!res.ok) return null;
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '');
+      return { ok: false, notFound: false, data: null, error: errorText || `Supabase error ${res.status}` };
+    }
+
     const rows = await res.json();
-    return rows.length > 0 ? rows[0].data : null;
-  } catch {
-    return null;
+    return {
+      ok: true,
+      notFound: rows.length === 0,
+      data: rows.length > 0 ? rows[0].data : null,
+    };
+  } catch (error) {
+    return { ok: false, notFound: false, data: null, error: error.message || "Erro de ligação ao Supabase" };
   }
 }
 
 export async function saveToCloud(id, data) {
   try {
-    // Upsert: insere ou atualiza
-    await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data`, {
       method: 'POST',
       headers: { ...headers, Prefer: 'resolution=merge-duplicates' },
       body: JSON.stringify({ id, data, updated_at: new Date().toISOString() }),
     });
-  } catch {
-    // Falha silenciosa — localStorage serve de backup
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '');
+      return { ok: false, error: errorText || `Supabase error ${res.status}` };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error.message || "Erro de ligação ao Supabase" };
   }
 }

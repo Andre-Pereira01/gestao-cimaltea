@@ -7,7 +7,7 @@ import {
   flatMusicians, getReforcoMusicians, currency,
 } from "./components.jsx";
 import {
-  getStoredHash, setPassword, verifyPassword,
+  getStoredHash, setPassword as savePassword, verifyPassword,
   isSessionActive, setSession, clearSession,
 } from "./auth.js";
 
@@ -184,8 +184,14 @@ function LoginScreen({ onAuth }) {
 
   useEffect(() => {
     (async () => {
-      const hash = await getStoredHash();
-      setMode(hash ? "login" : "setup");
+    const result = await getStoredHash();
+
+        if (!result.ok) {
+          setError("Não foi possível verificar a password no cloud.");
+          setMode("login");
+        } else {
+          setMode(result.hash ? "login" : "setup");
+        }
       setTimeout(() => inputRef.current?.focus(), 100);
     })();
   }, []);
@@ -194,14 +200,17 @@ function LoginScreen({ onAuth }) {
     if (!password) return;
     setLoading(true);
     setError("");
-    const ok = await verifyPassword(password);
-    if (ok) {
-      setSession();
-      onAuth();
-    } else {
-      setError("Password incorreta.");
-      setPassword("");
-    }
+    const result = await verifyPassword(password);
+
+      if (result.ok && result.valid) {
+        setSession();
+        onAuth();
+      } else if (!result.ok) {
+        setError("Erro ao validar a password.");
+      } else {
+        setError("Password incorreta.");
+        setPassword("");
+      }
     setLoading(false);
   };
 
@@ -215,10 +224,18 @@ function LoginScreen({ onAuth }) {
       return;
     }
     setLoading(true);
-    await setPassword(password);
-    setSession();
-    onAuth();
-    setLoading(false);
+    setError("");
+    try {
+      const result = await savePassword(password);
+      if (!result.ok) {
+        setError(result.error || "Não foi possível gravar a password.");
+        return;
+      }
+      setSession();
+      onAuth();
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (mode === "checking") {
@@ -1285,7 +1302,7 @@ function useCloudSync(key, data) {
     if (data === null) return;
     saveLocal(key, data);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => saveToCloud(key, data), 2000);
+    timer.current = setTimeout(() => { void saveToCloud(key, data); }, 2000);
     return () => clearTimeout(timer.current);
   }, [key, data]);
 }
@@ -1309,11 +1326,16 @@ export default function App() {
     if (!authenticated) return;
     (async () => {
       setSyncStatus("loading");
-      const cloudNaipes = await loadFromCloud("naipes");
-      const cloudRooms = await loadFromCloud("rooms");
-      const cloudPayments = await loadFromCloud("payments");
-      const cloudAccommodation = await loadFromCloud("accommodation");
-      const cloudDocuments = await loadFromCloud("documents");
+      const cloudNaipesResult = await loadFromCloud("naipes");
+      const cloudRoomsResult = await loadFromCloud("rooms");
+      const cloudPaymentsResult = await loadFromCloud("payments");
+      const cloudAccommodationResult = await loadFromCloud("accommodation");
+      const cloudDocumentsResult = await loadFromCloud("documents");
+      const cloudNaipes = cloudNaipesResult.ok && !cloudNaipesResult.notFound ? cloudNaipesResult.data : null;
+      const cloudRooms = cloudRoomsResult.ok && !cloudRoomsResult.notFound ? cloudRoomsResult.data : null;
+      const cloudPayments = cloudPaymentsResult.ok && !cloudPaymentsResult.notFound ? cloudPaymentsResult.data : null;
+      const cloudAccommodation = cloudAccommodationResult.ok && !cloudAccommodationResult.notFound ? cloudAccommodationResult.data : null;
+      const cloudDocuments = cloudDocumentsResult.ok && !cloudDocumentsResult.notFound ? cloudDocumentsResult.data : null;
 
       if (cloudNaipes) {
         // Migrate: ensure all musicians have dni field
