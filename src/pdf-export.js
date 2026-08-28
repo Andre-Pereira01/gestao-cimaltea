@@ -61,6 +61,7 @@ export function exportRosterPDF(naipes) {
         num++,
         m.name,
         n.name,
+        m.dni || "",
         m.reforco ? "Sim" : "",
         m.status === "confirmado" ? "Confirmado" : "Pendente",
         m.comments || "",
@@ -70,27 +71,28 @@ export function exportRosterPDF(naipes) {
 
   autoTable(doc, {
     startY: y,
-    head: [["N.º", "Nome", "Naipe", "Reforço", "Estado", "Observações"]],
+    head: [["N.º", "Nome", "Naipe", "DNI/CC", "Reforço", "Estado", "Observações"]],
     body: rows,
     styles: { fontSize: 8, cellPadding: 1.5 },
     headStyles: { fillColor: [41, 65, 107], fontStyle: "bold", fontSize: 8 },
     columnStyles: {
       0: { cellWidth: 10, halign: "right" },
-      1: { cellWidth: 45 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 14, halign: "center" },
-      4: { cellWidth: 20 },
-      5: { cellWidth: 55 },
+      1: { cellWidth: 38 },
+      2: { cellWidth: 24 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 12, halign: "center" },
+      5: { cellWidth: 18 },
+      6: { cellWidth: 48 },
     },
     didParseCell: (data) => {
       if (data.section === "body") {
-        const status = data.row.raw[4];
+        const status = data.row.raw[5];
         if (status === "Pendente") {
           data.cell.styles.textColor = [160, 120, 0];
           data.cell.styles.fontStyle = "italic";
         }
-        const reforco = data.row.raw[3];
-        if (reforco === "Sim" && data.column.index === 3) {
+        const reforco = data.row.raw[4];
+        if (reforco === "Sim" && data.column.index === 4) {
           data.cell.styles.textColor = [30, 100, 160];
           data.cell.styles.fontStyle = "bold";
         }

@@ -1,134 +1,165 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { loadFromCloud, saveToCloud } from "./supabase.js";
 import { exportRosterPDF, exportRoomsPDF } from "./pdf-export.js";
+import { exportRosterDOCX, exportRoomsDOCX } from "./docx-export.js";
+import {
+  uid, Badge, Stat, ExportDropdown, isOutros, getStats,
+  flatMusicians, getReforcoMusicians, currency,
+} from "./components.jsx";
+import {
+  getStoredHash, setPassword, verifyPassword,
+  isSessionActive, setSession, clearSession,
+} from "./auth.js";
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+// ════════════════════════════════════════════════════════════════════
+// DADOS INICIAIS
+// ════════════════════════════════════════════════════════════════════
 
 const INITIAL_NAIPES = [
   { id: uid(), name: "Flauta", musicians: [
-    { id: uid(), name: "Alexandra Pedreira", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Ana Rita Barros", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Érica Fernandes", reforco: false, status: "pendente", comments: "Dia da defesa nacional, vai entregar declaração passada pela banda e pedir adiamento" },
-    { id: uid(), name: "Evelyn Paula", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Gabriela Ferreira", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Alexandra Pedreira", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Ana Rita Barros", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Érica Fernandes", reforco: false, status: "pendente", comments: "Dia da defesa nacional, vai entregar declaração passada pela banda e pedir adiamento", dni: "" },
+    { id: uid(), name: "Evelyn Paula", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Gabriela Ferreira", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Oboé", musicians: [
-    { id: uid(), name: "Rafael Figueiredo", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Gabriel Sousa", reforco: true, status: "pendente", comments: "Apenas apalavrado" },
-    { id: uid(), name: "Lali Rosal", reforco: true, status: "pendente", comments: "Apenas apalavrado" },
+    { id: uid(), name: "Rafael Figueiredo", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Gabriel Sousa", reforco: true, status: "pendente", comments: "Apenas apalavrado", dni: "" },
+    { id: uid(), name: "Lali Rosal", reforco: true, status: "pendente", comments: "Apenas apalavrado", dni: "" },
   ]},
   { id: uid(), name: "Fagote", musicians: [
-    { id: uid(), name: "Carolina Soares", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Sara Gonçalves", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Carolina Soares", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Sara Gonçalves", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Clarinete", musicians: [
-    { id: uid(), name: "Ana Isabel Machado Rodrigues", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Ana Maria Silva", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Beatriz Caldas", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Carla Fernandes", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Daniela Fernandes", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "João Simões", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "João Valinho", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "João Carlos Abrantes Oterelo", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "José Miguel Pedreira Pereira", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Leonor Cardoso", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Lucas Pires", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Margarida Costa", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Mariana Moniz", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Rita Moreira", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Rodrigo Souto", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Sofia Viana", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Sara Pumar", reforco: true, status: "confirmado", comments: "" },
-    { id: uid(), name: "Daniel Vieira", reforco: true, status: "confirmado", comments: "" },
+    { id: uid(), name: "Ana Isabel Machado Rodrigues", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Ana Maria Silva", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Beatriz Caldas", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Carla Fernandes", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Daniela Fernandes", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "João Simões", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "João Valinho", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "João Carlos Abrantes Oterelo", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "José Miguel Pedreira Pereira", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Leonor Cardoso", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Lucas Pires", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Margarida Costa", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Mariana Moniz", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Rita Moreira", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Rodrigo Souto", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Sofia Viana", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Sara Pumar", reforco: true, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Daniel Vieira", reforco: true, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Requinta", musicians: [
-    { id: uid(), name: "Javier Pousa", reforco: true, status: "confirmado", comments: "" },
+    { id: uid(), name: "Javier Pousa", reforco: true, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Clarinete Baixo", musicians: [
-    { id: uid(), name: "Beatriz Duarte", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Beatriz Duarte", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Saxofone Soprano", musicians: [
-    { id: uid(), name: "Nerea Alonso Rodríguez", reforco: false, status: "pendente", comments: "Pede para ir sexta" },
+    { id: uid(), name: "Nerea Alonso Rodríguez", reforco: false, status: "pendente", comments: "Pede para ir sexta", dni: "" },
   ]},
   { id: uid(), name: "Saxofone Alto", musicians: [
-    { id: uid(), name: "Afonso Esteves", reforco: false, status: "pendente", comments: "Universidade" },
-    { id: uid(), name: "Anna Paula", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Camila Costa", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Matilde Pires", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Vânia Fernandes", reforco: false, status: "pendente", comments: "Não deu justificação concreta após várias mensagens" },
-    { id: uid(), name: "Prof. Saxofone Academia", reforco: true, status: "confirmado", comments: "" },
+    { id: uid(), name: "Afonso Esteves", reforco: false, status: "pendente", comments: "Universidade", dni: "" },
+    { id: uid(), name: "Anna Paula", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Camila Costa", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Matilde Pires", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Vânia Fernandes", reforco: false, status: "pendente", comments: "Não deu justificação concreta após várias mensagens", dni: "" },
+    { id: uid(), name: "Prof. Saxofone Academia", reforco: true, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Saxofone Tenor", musicians: [
-    { id: uid(), name: "Eduarda Simplício", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Filipe Pedreira", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Gabriel Afonso", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Eduarda Simplício", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Filipe Pedreira", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Gabriel Afonso", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Saxofone Barítono", musicians: [
-    { id: uid(), name: "Leandro Gonçalves", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Leandro Gonçalves", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Trompa", musicians: [
-    { id: uid(), name: "Afonso Silva", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Francisco Lourenço", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "João Pereira", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Joel Santos", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Leonor Esteves", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Pedro Silva", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Afonso Silva", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Francisco Lourenço", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "João Pereira", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Joel Santos", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Leonor Esteves", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Pedro Silva", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Trompete", musicians: [
-    { id: uid(), name: "André Pereira", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "António Pereira Pereira", reforco: false, status: "pendente", comments: "Disponibilidade Setembro" },
-    { id: uid(), name: "Hugo Gonçalves", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "João Lourenço", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Manuel Madarnás", reforco: true, status: "confirmado", comments: "" },
-    { id: uid(), name: "Pedro Esteves", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Renato Pereira", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Tomás Lourenço", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Guilherme Tangil", reforco: true, status: "pendente", comments: "" },
+    { id: uid(), name: "André Pereira", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "António Pereira Pereira", reforco: false, status: "pendente", comments: "Disponibilidade Setembro", dni: "" },
+    { id: uid(), name: "Hugo Gonçalves", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "João Lourenço", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Manuel Madarnás", reforco: true, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Pedro Esteves", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Renato Pereira", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Tomás Lourenço", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Guilherme Tangil", reforco: true, status: "pendente", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Trombone", musicians: [
-    { id: uid(), name: "António Afonso", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Eduardo Carvalho", reforco: true, status: "confirmado", comments: "" },
-    { id: uid(), name: "João Cardoso", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Lucas Coelho", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Roberto Rodrigues", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Tomás Pereira", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "António Afonso", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Eduardo Carvalho", reforco: true, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "João Cardoso", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Lucas Coelho", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Roberto Rodrigues", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Tomás Pereira", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Eufónio", musicians: [
-    { id: uid(), name: "Helder Fernandes", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Bruno Ribeiro", reforco: true, status: "confirmado", comments: "" },
-    { id: uid(), name: "Mariana Firmino", reforco: true, status: "confirmado", comments: "" },
+    { id: uid(), name: "Helder Fernandes", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Bruno Ribeiro", reforco: true, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Mariana Firmino", reforco: true, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Tuba", musicians: [
-    { id: uid(), name: "Hugo Barreira", reforco: false, status: "pendente", comments: "Disponibilidade em Outubro" },
-    { id: uid(), name: "João Silva", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Luís Nunes", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Ricardo Pereira", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Cesar Salceda", reforco: true, status: "confirmado", comments: "" },
+    { id: uid(), name: "Hugo Barreira", reforco: false, status: "pendente", comments: "Disponibilidade em Outubro", dni: "" },
+    { id: uid(), name: "João Silva", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Luís Nunes", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Ricardo Pereira", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Cesar Salceda", reforco: true, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Violoncelo", musicians: [
-    { id: uid(), name: "Luciana Rodrigues", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Marco Machado", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Filha Cesar Salceda", reforco: true, status: "confirmado", comments: "" },
-    { id: uid(), name: "Leonor Lemos", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Luciana Rodrigues", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Marco Machado", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Filha Cesar Salceda", reforco: true, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Leonor Lemos", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Contrabaixo", musicians: [
-    { id: uid(), name: "Carlos Passos", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Carlos Passos", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
   { id: uid(), name: "Percussão", musicians: [
-    { id: uid(), name: "Bruno Sanches", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Caio Rodrigues", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "David Ribeiro", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Diego Rodrigues", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Fábio Fernandes", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Francisco Simões", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Jorge Fernandes", reforco: false, status: "confirmado", comments: "" },
-    { id: uid(), name: "Rodrigo Dias", reforco: false, status: "confirmado", comments: "" },
+    { id: uid(), name: "Bruno Sanches", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Caio Rodrigues", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "David Ribeiro", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Diego Rodrigues", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Fábio Fernandes", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Francisco Simões", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Jorge Fernandes", reforco: false, status: "confirmado", comments: "", dni: "" },
+    { id: uid(), name: "Rodrigo Dias", reforco: false, status: "confirmado", comments: "", dni: "" },
   ]},
 ];
 
 const INITIAL_ROOMS = [];
 
-// Storage via localStorage
+const INITIAL_PAYMENTS = [];
+
+const INITIAL_ACCOMMODATION = [];
+
+const INITIAL_DOCUMENTS = [
+  { id: uid(), title: "Inventário de dados (formulário online CIMALTEA)", deadline: "2026-09-15", status: "pendente", comments: "" },
+  { id: uid(), title: "Listado de músicos (.xlsx) — nome, DNI, instrumento, solo, reforço", deadline: "2026-09-15", status: "pendente", comments: "Modificável até 25/11" },
+  { id: uid(), title: "Certificação do listado de músicos (Secretário + Presidente)", deadline: "2026-09-15", status: "pendente", comments: "Atualizável até 28/11. Necessário por sermos banda estrangeira (ponto 6.1.b)" },
+  { id: uid(), title: "4 exemplares da partitura da obra livre (O Patrulheiro da GNR)", deadline: "2026-09-15", status: "pendente", comments: "" },
+  { id: uid(), title: "1 exemplar da partitura/guião da composição curta de apresentação", deadline: "2026-09-15", status: "pendente", comments: "" },
+  { id: uid(), title: "Vídeo de apresentação da banda (max. 3 min, AVI/MP4 ou link)", deadline: "2026-09-15", status: "pendente", comments: "" },
+  { id: uid(), title: "Fotografia recente da banda e do maestro (JPG ou link)", deadline: "2026-09-15", status: "pendente", comments: "" },
+  { id: uid(), title: "Historial da banda (.doc/.txt, max 1200 caracteres)", deadline: "2026-09-15", status: "pendente", comments: "" },
+  { id: uid(), title: "Curriculum do maestro (.doc/.txt, max 1200 caracteres)", deadline: "2026-09-15", status: "pendente", comments: "" },
+  { id: uid(), title: "Justificante de pagamento da fiança (600€ — CaixaBank)", deadline: "2026-05-15", status: "pendente", comments: "IBAN: ES46 2100 2611 3413 0028 5423" },
+];
+
+// ════════════════════════════════════════════════════════════════════
+// LOCAL STORAGE HELPERS
+// ════════════════════════════════════════════════════════════════════
+
 function loadLocal(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -139,63 +170,142 @@ function saveLocal(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 }
 
-const isOutros = (name) => name.trim().toLowerCase() === "outros";
+// ════════════════════════════════════════════════════════════════════
+// ECRÃ DE LOGIN
+// ════════════════════════════════════════════════════════════════════
 
-function getStats(naipes) {
-  let total = 0, conf = 0, pend = 0, ref = 0, outros = 0;
-  for (const n of naipes) {
-    if (isOutros(n.name)) { outros += n.musicians.length; continue; }
-    for (const m of n.musicians) {
-      total++;
-      if (m.status === "confirmado") conf++; else pend++;
-      if (m.reforco) ref++;
+function LoginScreen({ onAuth }) {
+  const [mode, setMode] = useState("checking"); // checking | login | setup
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef();
+
+  useEffect(() => {
+    (async () => {
+      const hash = await getStoredHash();
+      setMode(hash ? "login" : "setup");
+      setTimeout(() => inputRef.current?.focus(), 100);
+    })();
+  }, []);
+
+  const handleLogin = async () => {
+    if (!password) return;
+    setLoading(true);
+    setError("");
+    const ok = await verifyPassword(password);
+    if (ok) {
+      setSession();
+      onAuth();
+    } else {
+      setError("Password incorreta.");
+      setPassword("");
     }
-  }
-  return { total, conf, pend, ref, plantilla: total - ref, outros };
-}
-
-function flatMusicians(naipes) {
-  const list = [];
-  let num = 1;
-  for (const n of naipes) for (const m of n.musicians) {
-    list.push({ ...m, naipe: n.name, globalNum: num++ });
-  }
-  return list;
-}
-
-function Badge({ children, color }) {
-  const colors = {
-    green: "bg-emerald-100 text-emerald-800",
-    yellow: "bg-amber-100 text-amber-800",
-    blue: "bg-sky-100 text-sky-800",
-    gray: "bg-gray-100 text-gray-600",
-    red: "bg-rose-100 text-rose-700",
+    setLoading(false);
   };
-  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[color] || colors.gray}`}>{children}</span>;
-}
 
-function Stat({ label, value, sub }) {
+  const handleSetup = async () => {
+    if (password.length < 4) {
+      setError("Mínimo 4 caracteres.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("As passwords não coincidem.");
+      return;
+    }
+    setLoading(true);
+    await setPassword(password);
+    setSession();
+    onAuth();
+    setLoading(false);
+  };
+
+  if (mode === "checking") {
+    return <div className="flex items-center justify-center h-screen text-gray-400">A verificar...</div>;
+  }
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 min-w-0">
-      <div className="text-2xl font-semibold text-gray-900">{value}</div>
-      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
-      {sub && <div className="text-xs text-gray-400">{sub}</div>}
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4">
+      <div className="w-full max-w-sm">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h1 className="text-lg font-bold text-gray-900 text-center mb-1">CIMALTEA 2026</h1>
+          <p className="text-xs text-gray-400 text-center mb-6">Banda Musical de Monção — Gestão</p>
+
+          {mode === "setup" && (
+            <>
+              <p className="text-sm text-gray-600 mb-4">Primeira utilização. Define uma password de acesso:</p>
+              <input
+                ref={inputRef}
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <input
+                type="password"
+                placeholder="Confirmar password"
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSetup()}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <button
+                onClick={handleSetup}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? "..." : "Definir password e entrar"}
+              </button>
+            </>
+          )}
+
+          {mode === "login" && (
+            <>
+              <input
+                ref={inputRef}
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleLogin()}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <button
+                onClick={handleLogin}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? "..." : "Entrar"}
+              </button>
+            </>
+          )}
+
+          {error && <p className="text-red-500 text-xs mt-3 text-center">{error}</p>}
+        </div>
+      </div>
     </div>
   );
 }
+
+// ════════════════════════════════════════════════════════════════════
+// INLINE FORMS (Roster)
+// ════════════════════════════════════════════════════════════════════
 
 function AddMusicianInline({ onAdd, onCancel }) {
   const [name, setName] = useState("");
   const [reforco, setReforco] = useState(false);
   const [status, setStatus] = useState("confirmado");
   const [comments, setComments] = useState("");
+  const [dni, setDni] = useState("");
   const ref = useRef();
   useEffect(() => { ref.current?.focus(); }, []);
 
   const submit = () => {
     if (!name.trim()) return;
-    onAdd({ name: name.trim(), reforco, status, comments: comments.trim() });
-    setName(""); setReforco(false); setStatus("confirmado"); setComments("");
+    onAdd({ name: name.trim(), reforco, status, comments: comments.trim(), dni: dni.trim() });
+    setName(""); setReforco(false); setStatus("confirmado"); setComments(""); setDni("");
     ref.current?.focus();
   };
 
@@ -211,6 +321,7 @@ function AddMusicianInline({ onAdd, onCancel }) {
           <option value="pendente">Pendente</option>
         </select>
       </div>
+      <input className="w-full border rounded px-2 py-1 text-xs" placeholder="DNI / CC (opcional)" value={dni} onChange={e => setDni(e.target.value)} />
       <input className="w-full border rounded px-2 py-1 text-xs" placeholder="Comentários (opcional)" value={comments} onChange={e => setComments(e.target.value)} />
       <div className="flex gap-2">
         <button onClick={submit} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Adicionar</button>
@@ -225,6 +336,7 @@ function EditMusicianInline({ m, onSave, onCancel }) {
   const [reforco, setReforco] = useState(m.reforco);
   const [status, setStatus] = useState(m.status);
   const [comments, setComments] = useState(m.comments);
+  const [dni, setDni] = useState(m.dni || "");
 
   return (
     <div className="space-y-1.5">
@@ -238,14 +350,19 @@ function EditMusicianInline({ m, onSave, onCancel }) {
           <option value="pendente">Pendente</option>
         </select>
       </div>
+      <input className="w-full border rounded px-2 py-1 text-xs" placeholder="DNI / CC" value={dni} onChange={e => setDni(e.target.value)} />
       <input className="w-full border rounded px-2 py-1 text-xs" placeholder="Comentários" value={comments} onChange={e => setComments(e.target.value)} />
       <div className="flex gap-2">
-        <button onClick={() => onSave({ name: name.trim(), reforco, status, comments: comments.trim() })} className="text-xs bg-blue-600 text-white px-3 py-1 rounded">Guardar</button>
+        <button onClick={() => onSave({ name: name.trim(), reforco, status, comments: comments.trim(), dni: dni.trim() })} className="text-xs bg-blue-600 text-white px-3 py-1 rounded">Guardar</button>
         <button onClick={onCancel} className="text-xs text-gray-500 px-2">Cancelar</button>
       </div>
     </div>
   );
 }
+
+// ════════════════════════════════════════════════════════════════════
+// SEPARADOR: MÚSICOS (Roster)
+// ════════════════════════════════════════════════════════════════════
 
 function RosterTab({ naipes, setNaipes }) {
   const [editingMusician, setEditingMusician] = useState(null);
@@ -314,6 +431,9 @@ function RosterTab({ naipes, setNaipes }) {
   const searchLower = search.toLowerCase();
   const matchesSearch = (m) => !search || m.name.toLowerCase().includes(searchLower);
 
+  // Count DNIs filled
+  const dniCount = naipes.filter(n => !isOutros(n.name)).reduce((s, n) => s + n.musicians.filter(m => m.dni).length, 0);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -322,7 +442,7 @@ function RosterTab({ naipes, setNaipes }) {
         <Stat label="Pendentes" value={stats.pend} />
         <Stat label="Reforços" value={stats.ref} />
         <Stat label="Plantilla" value={stats.plantilla} sub="(sem reforços)" />
-        <Stat label="Outros" value={stats.outros} sub="(não músicos)" />
+        <Stat label="DNI/CC" value={`${dniCount}/${stats.total}`} sub="preenchidos" />
       </div>
 
       <div className="flex gap-2 items-center">
@@ -332,9 +452,10 @@ function RosterTab({ naipes, setNaipes }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <button onClick={() => exportRosterPDF(naipes)} className="border border-gray-300 text-gray-600 text-sm px-3 py-2 rounded-lg hover:bg-gray-100 whitespace-nowrap" title="Exportar PDF">
-          ↓ PDF
-        </button>
+        <ExportDropdown
+          onPDF={() => exportRosterPDF(naipes)}
+          onDOCX={() => exportRosterDOCX(naipes)}
+        />
         <button onClick={() => setShowAddNaipe(true)} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap">
           + Naipe
         </button>
@@ -396,6 +517,7 @@ function RosterTab({ naipes, setNaipes }) {
                               {m.reforco && <Badge color="blue">reforço</Badge>}
                               {m.status === "pendente" && <Badge color="yellow">pendente</Badge>}
                               {m.status === "confirmado" && <Badge color="green">✓</Badge>}
+                              {m.dni && <span className="text-xs text-gray-400 font-mono">{m.dni}</span>}
                             </div>
                             {m.comments && <div className="text-xs text-gray-400 mt-0.5">{m.comments}</div>}
                           </div>
@@ -425,6 +547,10 @@ function RosterTab({ naipes, setNaipes }) {
     </div>
   );
 }
+
+// ════════════════════════════════════════════════════════════════════
+// SEPARADOR: QUARTOS (Rooms)
+// ════════════════════════════════════════════════════════════════════
 
 function RoomsTab({ naipes, rooms, setRooms }) {
   const [selectedSize, setSelectedSize] = useState(4);
@@ -469,15 +595,18 @@ function RoomsTab({ naipes, rooms, setRooms }) {
         <Stat label="Por atribuir" value={unassigned.length} />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm text-gray-600">Novo quarto de</span>
         {[1, 2, 3, 4].map(s => (
           <button key={s} onClick={() => setSelectedSize(s)} className={`w-8 h-8 rounded-lg text-sm font-medium border ${selectedSize === s ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"}`}>{s}</button>
         ))}
         <button onClick={addRoom} className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 ml-2">+ Quarto</button>
-        <button onClick={() => exportRoomsPDF(naipes, rooms)} className="border border-gray-300 text-gray-600 text-sm px-3 py-1.5 rounded-lg hover:bg-gray-100 whitespace-nowrap ml-auto" title="Exportar PDF">
-          ↓ PDF
-        </button>
+        <div className="ml-auto">
+          <ExportDropdown
+            onPDF={() => exportRoomsPDF(naipes, rooms)}
+            onDOCX={() => exportRoomsDOCX(naipes, rooms)}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -541,7 +670,615 @@ function RoomsTab({ naipes, rooms, setRooms }) {
   );
 }
 
-// Hook: debounce save to Supabase (2s after last change)
+// ════════════════════════════════════════════════════════════════════
+// SEPARADOR: PAGAMENTOS A REFORÇOS
+// ════════════════════════════════════════════════════════════════════
+
+function PaymentsTab({ naipes, payments, setPayments }) {
+  const [editing, setEditing] = useState(null);
+  const reforcos = getReforcoMusicians(naipes);
+
+  const addPayment = () => {
+    const p = {
+      id: uid(),
+      musicianName: "",
+      naipe: "",
+      feePerRehearsal: 0,
+      numRehearsals: 0,
+      performanceFee: 0,
+      travelExpenses: 0,
+      fuelKm: 0,
+      fuelRate: 0.10,
+      mealExpenses: 0,
+      otherExpenses: 0,
+      otherDescription: "",
+      paymentStatus: "pendente",
+      paymentMethod: "",
+      comments: "",
+    };
+    setPayments([...payments, p]);
+    setEditing(p.id);
+  };
+
+  const addFromReforco = (r) => {
+    // Check if already exists
+    if (payments.some(p => p.musicianName === r.name && p.naipe === r.naipe)) {
+      alert("Este reforço já tem um registo de pagamento.");
+      return;
+    }
+    const p = {
+      id: uid(),
+      musicianName: r.name,
+      naipe: r.naipe,
+      feePerRehearsal: 0,
+      numRehearsals: 0,
+      performanceFee: 0,
+      travelExpenses: 0,
+      fuelKm: 0,
+      fuelRate: 0.10,
+      mealExpenses: 0,
+      otherExpenses: 0,
+      otherDescription: "",
+      paymentStatus: "pendente",
+      paymentMethod: "",
+      comments: "",
+    };
+    setPayments([...payments, p]);
+    setEditing(p.id);
+  };
+
+  const updatePayment = (id, field, value) => {
+    setPayments(payments.map(p => p.id === id ? { ...p, [field]: value } : p));
+  };
+
+  const removePayment = (id) => {
+    if (!confirm("Remover este registo de pagamento?")) return;
+    setPayments(payments.filter(p => p.id !== id));
+    if (editing === id) setEditing(null);
+  };
+
+  const calcTotal = (p) => {
+    const rehearsals = (Number(p.feePerRehearsal) || 0) * (Number(p.numRehearsals) || 0);
+    const performance = Number(p.performanceFee) || 0;
+    const travel = Number(p.travelExpenses) || 0;
+    const fuel = (Number(p.fuelKm) || 0) * (Number(p.fuelRate) || 0);
+    const meals = Number(p.mealExpenses) || 0;
+    const other = Number(p.otherExpenses) || 0;
+    return rehearsals + performance + travel + fuel + meals + other;
+  };
+
+  const grandTotal = payments.reduce((s, p) => s + calcTotal(p), 0);
+  const paidTotal = payments.filter(p => p.paymentStatus === "pago").reduce((s, p) => s + calcTotal(p), 0);
+  const pendingTotal = grandTotal - paidTotal;
+
+  // Reforços not yet with payment record
+  const existingNames = new Set(payments.map(p => `${p.musicianName}||${p.naipe}`));
+  const missingReforcos = reforcos.filter(r => !existingNames.has(`${r.name}||${r.naipe}`));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Stat label="Reforços" value={reforcos.length} />
+        <Stat label="Total estimado" value={currency(grandTotal)} />
+        <Stat label="Pago" value={currency(paidTotal)} />
+        <Stat label="Pendente" value={currency(pendingTotal)} />
+      </div>
+
+      {missingReforcos.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <p className="text-xs text-amber-700 font-medium mb-2">Reforços sem registo de pagamento:</p>
+          <div className="flex flex-wrap gap-1">
+            {missingReforcos.map(r => (
+              <button
+                key={r.id}
+                onClick={() => addFromReforco(r)}
+                className="text-xs bg-white border border-amber-300 text-amber-800 px-2 py-1 rounded hover:bg-amber-100"
+              >
+                + {r.name} ({r.naipe})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button onClick={addPayment} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700">
+          + Registo manual
+        </button>
+      </div>
+
+      {payments.length === 0 && (
+        <div className="text-center text-gray-400 text-sm py-12 border border-dashed border-gray-300 rounded-lg">
+          Nenhum registo de pagamento. Adiciona a partir dos reforços acima ou manualmente.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {payments.map(p => {
+          const total = calcTotal(p);
+          const isEditing = editing === p.id;
+
+          return (
+            <div key={p.id} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <span className="font-semibold text-gray-800 text-sm flex-1">
+                  {p.musicianName || "Sem nome"} {p.naipe && <span className="text-gray-400 font-normal">({p.naipe})</span>}
+                </span>
+                <span className="text-sm font-semibold text-gray-900">{currency(total)}</span>
+                <Badge color={p.paymentStatus === "pago" ? "green" : p.paymentStatus === "parcial" ? "yellow" : "red"}>
+                  {p.paymentStatus}
+                </Badge>
+                <button onClick={() => setEditing(isEditing ? null : p.id)} className="text-gray-400 hover:text-blue-600 text-xs px-1">
+                  {isEditing ? "▲" : "▼"}
+                </button>
+                <button onClick={() => removePayment(p.id)} className="text-gray-400 hover:text-red-600 text-xs px-1">✕</button>
+              </div>
+
+              {isEditing && (
+                <div className="p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Nome</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={p.musicianName} onChange={e => updatePayment(p.id, "musicianName", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Naipe</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={p.naipe} onChange={e => updatePayment(p.id, "naipe", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-xs font-medium text-gray-600 mb-2">Ensaios</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Valor por ensaio (€)</label>
+                        <input type="number" min="0" step="5" className="w-full border rounded px-2 py-1.5 text-sm" value={p.feePerRehearsal || ""} onChange={e => updatePayment(p.id, "feePerRehearsal", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">N.º ensaios</label>
+                        <input type="number" min="0" className="w-full border rounded px-2 py-1.5 text-sm" value={p.numRehearsals || ""} onChange={e => updatePayment(p.id, "numRehearsals", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Subtotal ensaios</label>
+                        <div className="text-sm font-medium text-gray-700 py-1.5">{currency((Number(p.feePerRehearsal) || 0) * (Number(p.numRehearsals) || 0))}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-xs font-medium text-gray-600 mb-2">Atuação e deslocação</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Cachet atuação (€)</label>
+                        <input type="number" min="0" step="10" className="w-full border rounded px-2 py-1.5 text-sm" value={p.performanceFee || ""} onChange={e => updatePayment(p.id, "performanceFee", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Deslocação fixa (€)</label>
+                        <input type="number" min="0" step="5" className="w-full border rounded px-2 py-1.5 text-sm" value={p.travelExpenses || ""} onChange={e => updatePayment(p.id, "travelExpenses", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Alimentação (€)</label>
+                        <input type="number" min="0" step="5" className="w-full border rounded px-2 py-1.5 text-sm" value={p.mealExpenses || ""} onChange={e => updatePayment(p.id, "mealExpenses", e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-xs font-medium text-gray-600 mb-2">Gasolina (km)</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Km total</label>
+                        <input type="number" min="0" className="w-full border rounded px-2 py-1.5 text-sm" value={p.fuelKm || ""} onChange={e => updatePayment(p.id, "fuelKm", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">€/km</label>
+                        <input type="number" min="0" step="0.01" className="w-full border rounded px-2 py-1.5 text-sm" value={p.fuelRate || ""} onChange={e => updatePayment(p.id, "fuelRate", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Subtotal gasolina</label>
+                        <div className="text-sm font-medium text-gray-700 py-1.5">{currency((Number(p.fuelKm) || 0) * (Number(p.fuelRate) || 0))}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-xs font-medium text-gray-600 mb-2">Outros</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Valor (€)</label>
+                        <input type="number" min="0" step="5" className="w-full border rounded px-2 py-1.5 text-sm" value={p.otherExpenses || ""} onChange={e => updatePayment(p.id, "otherExpenses", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Descrição</label>
+                        <input className="w-full border rounded px-2 py-1.5 text-sm" value={p.otherDescription} onChange={e => updatePayment(p.id, "otherDescription", e.target.value)} placeholder="Ex: portagem, estacionamento" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Estado</label>
+                        <select className="w-full border rounded px-2 py-1.5 text-sm" value={p.paymentStatus} onChange={e => updatePayment(p.id, "paymentStatus", e.target.value)}>
+                          <option value="pendente">Pendente</option>
+                          <option value="parcial">Parcialmente pago</option>
+                          <option value="pago">Pago</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Método</label>
+                        <input className="w-full border rounded px-2 py-1.5 text-sm" value={p.paymentMethod} onChange={e => updatePayment(p.id, "paymentMethod", e.target.value)} placeholder="Transferência, numerário..." />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Total</label>
+                        <div className="text-lg font-bold text-gray-900 py-1">{currency(total)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Comentários</label>
+                    <textarea className="w-full border rounded px-2 py-1.5 text-sm" rows="2" value={p.comments} onChange={e => updatePayment(p.id, "comments", e.target.value)} placeholder="Notas adicionais..." />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SEPARADOR: ESTADIA (Accommodation)
+// ════════════════════════════════════════════════════════════════════
+
+const REGIMES = [
+  { value: "so_dormida", label: "Só dormida" },
+  { value: "alojamento_pequeno_almoco", label: "Alojamento + Peq. almoço" },
+  { value: "meia_pensao", label: "Meia pensão" },
+  { value: "pensao_completa", label: "Pensão completa" },
+  { value: "outro", label: "Outro" },
+];
+
+const BOOKING_STATUS = [
+  { value: "orcamento", label: "Orçamento" },
+  { value: "contactado", label: "Contactado" },
+  { value: "reservado", label: "Reservado" },
+  { value: "confirmado", label: "Confirmado" },
+  { value: "cancelado", label: "Cancelado" },
+  { value: "descartado", label: "Descartado" },
+];
+
+function AccommodationTab({ accommodation, setAccommodation }) {
+  const [editing, setEditing] = useState(null);
+
+  const addOption = () => {
+    const a = {
+      id: uid(),
+      name: "",
+      location: "",
+      regime: "pensao_completa",
+      pricePerPerson: 0,
+      numNights: 3,
+      numPeople: 85,
+      totalQuote: 0,
+      contactEmail: "",
+      contactPhone: "",
+      url: "",
+      bookingStatus: "orcamento",
+      checkIn: "2026-12-03",
+      checkOut: "2026-12-06",
+      pros: "",
+      cons: "",
+      comments: "",
+    };
+    setAccommodation([...accommodation, a]);
+    setEditing(a.id);
+  };
+
+  const updateOption = (id, field, value) => {
+    setAccommodation(accommodation.map(a => a.id === id ? { ...a, [field]: value } : a));
+  };
+
+  const removeOption = (id) => {
+    if (!confirm("Remover esta opção de alojamento?")) return;
+    setAccommodation(accommodation.filter(a => a.id !== id));
+    if (editing === id) setEditing(null);
+  };
+
+  const calcTotal = (a) => {
+    const manual = Number(a.totalQuote) || 0;
+    if (manual > 0) return manual;
+    return (Number(a.pricePerPerson) || 0) * (Number(a.numNights) || 0) * (Number(a.numPeople) || 0);
+  };
+
+  const activeOptions = accommodation.filter(a => !["cancelado", "descartado"].includes(a.bookingStatus));
+  const bestPrice = activeOptions.length > 0
+    ? Math.min(...activeOptions.map(a => {
+        const pp = Number(a.pricePerPerson) || 0;
+        return pp > 0 ? pp * (Number(a.numNights) || 1) : Infinity;
+      }))
+    : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Stat label="Opções" value={accommodation.length} />
+        <Stat label="Ativas" value={activeOptions.length} />
+        <Stat label="Menor preço/pessoa" value={bestPrice === Infinity ? "—" : currency(bestPrice)} sub={bestPrice !== Infinity ? `${accommodation.find(a => (Number(a.pricePerPerson)||0) * (Number(a.numNights)||1) === bestPrice)?.numNights || "?"} noites` : ""} />
+        <Stat label="Confirmadas" value={accommodation.filter(a => a.bookingStatus === "confirmado").length} />
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={addOption} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700">
+          + Opção de alojamento
+        </button>
+      </div>
+
+      {accommodation.length === 0 && (
+        <div className="text-center text-gray-400 text-sm py-12 border border-dashed border-gray-300 rounded-lg">
+          Nenhuma opção de alojamento registada.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {accommodation.map(a => {
+          const total = calcTotal(a);
+          const isEditing = editing === a.id;
+          const statusObj = BOOKING_STATUS.find(s => s.value === a.bookingStatus);
+          const regimeObj = REGIMES.find(r => r.value === a.regime);
+          const statusColor = {
+            orcamento: "gray", contactado: "yellow", reservado: "blue",
+            confirmado: "green", cancelado: "red", descartado: "red"
+          }[a.bookingStatus] || "gray";
+
+          return (
+            <div key={a.id} className={`border rounded-lg bg-white overflow-hidden ${["cancelado", "descartado"].includes(a.bookingStatus) ? "border-gray-100 opacity-60" : "border-gray-200"}`}>
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <span className="font-semibold text-gray-800 text-sm flex-1">
+                  {a.name || "Sem nome"} {a.location && <span className="text-gray-400 font-normal">— {a.location}</span>}
+                </span>
+                {Number(a.pricePerPerson) > 0 && (
+                  <span className="text-xs text-gray-500">{currency(a.pricePerPerson)}/pessoa/noite</span>
+                )}
+                <span className="text-sm font-semibold text-gray-900">{currency(total)}</span>
+                <Badge color={statusColor}>{statusObj?.label || a.bookingStatus}</Badge>
+                <button onClick={() => setEditing(isEditing ? null : a.id)} className="text-gray-400 hover:text-blue-600 text-xs px-1">
+                  {isEditing ? "▲" : "▼"}
+                </button>
+                <button onClick={() => removeOption(a.id)} className="text-gray-400 hover:text-red-600 text-xs px-1">✕</button>
+              </div>
+
+              {isEditing && (
+                <div className="p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Nome / Hotel</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={a.name} onChange={e => updateOption(a.id, "name", e.target.value)} placeholder="Ex: Servigroup Benidorm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Localização</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={a.location} onChange={e => updateOption(a.id, "location", e.target.value)} placeholder="Ex: Benidorm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Regime</label>
+                      <select className="w-full border rounded px-2 py-1.5 text-sm" value={a.regime} onChange={e => updateOption(a.id, "regime", e.target.value)}>
+                        {REGIMES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Preço/pessoa/noite (€)</label>
+                      <input type="number" min="0" step="5" className="w-full border rounded px-2 py-1.5 text-sm" value={a.pricePerPerson || ""} onChange={e => updateOption(a.id, "pricePerPerson", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">N.º noites</label>
+                      <input type="number" min="1" className="w-full border rounded px-2 py-1.5 text-sm" value={a.numNights || ""} onChange={e => updateOption(a.id, "numNights", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">N.º pessoas</label>
+                      <input type="number" min="1" className="w-full border rounded px-2 py-1.5 text-sm" value={a.numPeople || ""} onChange={e => updateOption(a.id, "numPeople", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Total orçamento (€)</label>
+                      <input type="number" min="0" step="50" className="w-full border rounded px-2 py-1.5 text-sm" value={a.totalQuote || ""} onChange={e => updateOption(a.id, "totalQuote", e.target.value)} placeholder="Auto se vazio" />
+                      <p className="text-xs text-gray-400 mt-0.5">Calculado: {currency((Number(a.pricePerPerson) || 0) * (Number(a.numNights) || 0) * (Number(a.numPeople) || 0))}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Check-in</label>
+                      <input type="date" className="w-full border rounded px-2 py-1.5 text-sm" value={a.checkIn || ""} onChange={e => updateOption(a.id, "checkIn", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Check-out</label>
+                      <input type="date" className="w-full border rounded px-2 py-1.5 text-sm" value={a.checkOut || ""} onChange={e => updateOption(a.id, "checkOut", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Email contacto</label>
+                      <input type="email" className="w-full border rounded px-2 py-1.5 text-sm" value={a.contactEmail} onChange={e => updateOption(a.id, "contactEmail", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Telefone</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={a.contactPhone} onChange={e => updateOption(a.id, "contactPhone", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">URL / Website</label>
+                      <input type="url" className="w-full border rounded px-2 py-1.5 text-sm" value={a.url} onChange={e => updateOption(a.id, "url", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Estado</label>
+                    <select className="w-full border rounded px-2 py-1.5 text-sm" value={a.bookingStatus} onChange={e => updateOption(a.id, "bookingStatus", e.target.value)}>
+                      {BOOKING_STATUS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Prós</label>
+                      <textarea className="w-full border rounded px-2 py-1.5 text-sm" rows="2" value={a.pros || ""} onChange={e => updateOption(a.id, "pros", e.target.value)} placeholder="Pontos positivos..." />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Contras</label>
+                      <textarea className="w-full border rounded px-2 py-1.5 text-sm" rows="2" value={a.cons || ""} onChange={e => updateOption(a.id, "cons", e.target.value)} placeholder="Pontos negativos..." />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Comentários</label>
+                    <textarea className="w-full border rounded px-2 py-1.5 text-sm" rows="2" value={a.comments} onChange={e => updateOption(a.id, "comments", e.target.value)} placeholder="Notas adicionais..." />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SEPARADOR: DOCUMENTAÇÃO (Documents Checklist)
+// ════════════════════════════════════════════════════════════════════
+
+function DocumentsTab({ documents, setDocuments }) {
+  const [editing, setEditing] = useState(null);
+
+  const addDocument = () => {
+    const d = { id: uid(), title: "", deadline: "", status: "pendente", comments: "" };
+    setDocuments([...documents, d]);
+    setEditing(d.id);
+  };
+
+  const updateDocument = (id, field, value) => {
+    setDocuments(documents.map(d => d.id === id ? { ...d, [field]: value } : d));
+  };
+
+  const removeDocument = (id) => {
+    if (!confirm("Remover este documento?")) return;
+    setDocuments(documents.filter(d => d.id !== id));
+  };
+
+  const toggleStatus = (id) => {
+    const d = documents.find(x => x.id === id);
+    if (!d) return;
+    const next = d.status === "pendente" ? "em_preparacao" : d.status === "em_preparacao" ? "entregue" : "pendente";
+    updateDocument(id, "status", next);
+  };
+
+  const total = documents.length;
+  const delivered = documents.filter(d => d.status === "entregue").length;
+  const inProgress = documents.filter(d => d.status === "em_preparacao").length;
+  const pending = documents.filter(d => d.status === "pendente").length;
+
+  const statusColor = (s) => s === "entregue" ? "green" : s === "em_preparacao" ? "yellow" : "red";
+  const statusLabel = (s) => s === "entregue" ? "Entregue" : s === "em_preparacao" ? "Em preparação" : "Pendente";
+
+  // Days until first deadline
+  const today = new Date();
+  const nextDeadline = documents
+    .filter(d => d.status !== "entregue" && d.deadline)
+    .map(d => new Date(d.deadline))
+    .filter(d => d > today)
+    .sort((a, b) => a - b)[0];
+  const daysLeft = nextDeadline ? Math.ceil((nextDeadline - today) / 86400000) : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <Stat label="Total" value={total} />
+        <Stat label="Entregues" value={delivered} />
+        <Stat label="Em preparação" value={inProgress} />
+        <Stat label="Pendentes" value={pending} />
+        <Stat label="Próximo prazo" value={daysLeft !== null ? `${daysLeft} dias` : "—"} sub={nextDeadline ? nextDeadline.toLocaleDateString("pt-PT") : ""} />
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
+        Documentação exigida pelas bases do 51.º CIMALTEA (pontos 3.2 e 4.1). Prazo principal: 15 de setembro de 2026. Listado de músicos modificável até 25/11, certificação até 28/11.
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={addDocument} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700">
+          + Documento
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {documents.map(d => {
+          const isEditing = editing === d.id;
+          const overdue = d.deadline && d.status !== "entregue" && new Date(d.deadline) < today;
+
+          return (
+            <div key={d.id} className={`border rounded-lg bg-white overflow-hidden ${overdue ? "border-red-300" : "border-gray-200"}`}>
+              <div className="flex items-center gap-2 px-4 py-3">
+                <button
+                  onClick={() => toggleStatus(d.id)}
+                  className={`w-5 h-5 rounded flex-shrink-0 border-2 flex items-center justify-center text-xs
+                    ${d.status === "entregue" ? "bg-emerald-500 border-emerald-500 text-white" :
+                      d.status === "em_preparacao" ? "bg-amber-100 border-amber-400 text-amber-600" :
+                      "bg-white border-gray-300 text-transparent hover:border-gray-400"}`}
+                >
+                  {d.status === "entregue" ? "✓" : d.status === "em_preparacao" ? "…" : ""}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <span className={`text-sm ${d.status === "entregue" ? "text-gray-400 line-through" : "text-gray-800"}`}>
+                    {d.title || "Sem título"}
+                  </span>
+                  {d.deadline && (
+                    <span className={`ml-2 text-xs ${overdue ? "text-red-500 font-medium" : "text-gray-400"}`}>
+                      {overdue ? "Atrasado — " : ""}até {new Date(d.deadline).toLocaleDateString("pt-PT")}
+                    </span>
+                  )}
+                  {d.comments && !isEditing && <div className="text-xs text-gray-400 mt-0.5">{d.comments}</div>}
+                </div>
+                <Badge color={statusColor(d.status)}>{statusLabel(d.status)}</Badge>
+                <button onClick={() => setEditing(isEditing ? null : d.id)} className="text-gray-400 hover:text-blue-600 text-xs px-1">✎</button>
+                <button onClick={() => removeDocument(d.id)} className="text-gray-400 hover:text-red-600 text-xs px-1">✕</button>
+              </div>
+
+              {isEditing && (
+                <div className="px-4 pb-3 space-y-2 border-t border-gray-100 pt-2">
+                  <input className="w-full border rounded px-2 py-1.5 text-sm" placeholder="Título / Descrição" value={d.title} onChange={e => updateDocument(d.id, "title", e.target.value)} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Prazo</label>
+                      <input type="date" className="w-full border rounded px-2 py-1.5 text-sm" value={d.deadline} onChange={e => updateDocument(d.id, "deadline", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Estado</label>
+                      <select className="w-full border rounded px-2 py-1.5 text-sm" value={d.status} onChange={e => updateDocument(d.id, "status", e.target.value)}>
+                        <option value="pendente">Pendente</option>
+                        <option value="em_preparacao">Em preparação</option>
+                        <option value="entregue">Entregue</option>
+                      </select>
+                    </div>
+                  </div>
+                  <textarea className="w-full border rounded px-2 py-1.5 text-xs" rows="2" placeholder="Comentários / notas" value={d.comments} onChange={e => updateDocument(d.id, "comments", e.target.value)} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CLOUD SYNC HOOK
+// ════════════════════════════════════════════════════════════════════
+
 function useCloudSync(key, data) {
   const timer = useRef(null);
   useEffect(() => {
@@ -553,46 +1290,95 @@ function useCloudSync(key, data) {
   }, [key, data]);
 }
 
+// ════════════════════════════════════════════════════════════════════
+// APP PRINCIPAL
+// ════════════════════════════════════════════════════════════════════
+
 export default function App() {
+  const [authenticated, setAuthenticated] = useState(isSessionActive());
   const [naipes, setNaipes] = useState(null);
   const [rooms, setRooms] = useState(null);
+  const [payments, setPayments] = useState(null);
+  const [accommodation, setAccommodation] = useState(null);
+  const [documents, setDocuments] = useState(null);
   const [tab, setTab] = useState("roster");
   const [syncStatus, setSyncStatus] = useState("loading");
 
-  // Load: cloud first, localStorage fallback, initial data last resort
+  // ── Load data from cloud / local ──
   useEffect(() => {
+    if (!authenticated) return;
     (async () => {
       setSyncStatus("loading");
       const cloudNaipes = await loadFromCloud("naipes");
       const cloudRooms = await loadFromCloud("rooms");
+      const cloudPayments = await loadFromCloud("payments");
+      const cloudAccommodation = await loadFromCloud("accommodation");
+      const cloudDocuments = await loadFromCloud("documents");
 
       if (cloudNaipes) {
-        setNaipes(cloudNaipes);
+        // Migrate: ensure all musicians have dni field
+        const migratedNaipes = cloudNaipes.map(n => ({
+          ...n,
+          musicians: n.musicians.map(m => ({ dni: "", ...m })),
+        }));
+        setNaipes(migratedNaipes);
         setRooms(cloudRooms || []);
-        saveLocal("cimaltea-naipes", cloudNaipes);
+        setPayments(cloudPayments || []);
+        setAccommodation(cloudAccommodation || []);
+        setDocuments(cloudDocuments || INITIAL_DOCUMENTS);
+        saveLocal("cimaltea-naipes", migratedNaipes);
         saveLocal("cimaltea-rooms", cloudRooms || []);
+        saveLocal("cimaltea-payments", cloudPayments || []);
+        saveLocal("cimaltea-accommodation", cloudAccommodation || []);
+        saveLocal("cimaltea-documents", cloudDocuments || INITIAL_DOCUMENTS);
         setSyncStatus("cloud");
       } else {
-        setNaipes(loadLocal("cimaltea-naipes", INITIAL_NAIPES));
+        const localNaipes = loadLocal("cimaltea-naipes", INITIAL_NAIPES);
+        const migratedLocal = localNaipes.map(n => ({
+          ...n,
+          musicians: n.musicians.map(m => ({ dni: "", ...m })),
+        }));
+        setNaipes(migratedLocal);
         setRooms(loadLocal("cimaltea-rooms", INITIAL_ROOMS));
+        setPayments(loadLocal("cimaltea-payments", INITIAL_PAYMENTS));
+        setAccommodation(loadLocal("cimaltea-accommodation", INITIAL_ACCOMMODATION));
+        setDocuments(loadLocal("cimaltea-documents", INITIAL_DOCUMENTS));
         setSyncStatus("local");
       }
     })();
-  }, []);
+  }, [authenticated]);
 
+  // ── Cloud sync ──
   useCloudSync("naipes", naipes);
   useCloudSync("rooms", rooms);
+  useCloudSync("payments", payments);
+  useCloudSync("accommodation", accommodation);
+  useCloudSync("documents", documents);
 
-  if (!naipes || !rooms) {
+  // ── Auth gate ──
+  if (!authenticated) {
+    return <LoginScreen onAuth={() => setAuthenticated(true)} />;
+  }
+
+  if (!naipes || !rooms || !payments || !accommodation || !documents) {
     return <div className="flex items-center justify-center h-screen text-gray-400">A carregar...</div>;
   }
 
   const stats = getStats(naipes);
 
+  const TABS = [
+    { id: "roster", label: `Músicos (${stats.total})` },
+    { id: "rooms", label: "Quartos" },
+    { id: "payments", label: "Pagamentos" },
+    { id: "accommodation", label: "Estadia" },
+    { id: "documents", label: "Documentação" },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-5xl mx-auto flex items-center gap-3">
+        <div className="max-w-6xl mx-auto flex items-center gap-3">
           <div className="flex-1">
             <h1 className="text-lg font-bold text-gray-900">CIMALTEA 2026 — Gestão</h1>
             <p className="text-xs text-gray-400 mt-0.5">Banda Musical de Monção · 51.º Certamen Internacional de Música "Vila d'Altea"</p>
@@ -600,20 +1386,53 @@ export default function App() {
           <span className={`text-xs px-2 py-1 rounded-full ${syncStatus === "cloud" ? "bg-emerald-100 text-emerald-700" : syncStatus === "local" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"}`}>
             {syncStatus === "cloud" ? "☁ Sincronizado" : syncStatus === "local" ? "💾 Apenas local" : "…"}
           </span>
+          <button
+            onClick={() => { clearSession(); setAuthenticated(false); }}
+            className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1"
+            title="Terminar sessão"
+          >
+            Sair
+          </button>
         </div>
       </div>
+
+      {/* Tabs */}
       <div className="bg-white border-b border-gray-200 px-4">
-        <div className="max-w-5xl mx-auto flex gap-0">
-          <button onClick={() => setTab("roster")} className={`px-4 py-3 text-sm font-medium border-b-2 ${tab === "roster" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>Músicos ({stats.total})</button>
-          <button onClick={() => setTab("rooms")} className={`px-4 py-3 text-sm font-medium border-b-2 ${tab === "rooms" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>Quartos</button>
+        <div className="max-w-6xl mx-auto flex gap-0 overflow-x-auto">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${tab === t.id ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
-      <div className="max-w-5xl mx-auto px-4 py-6">
+
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-4 py-6">
         {tab === "roster" && <RosterTab naipes={naipes} setNaipes={setNaipes} />}
         {tab === "rooms" && <RoomsTab naipes={naipes} rooms={rooms} setRooms={setRooms} />}
+        {tab === "payments" && <PaymentsTab naipes={naipes} payments={payments} setPayments={setPayments} />}
+        {tab === "accommodation" && <AccommodationTab accommodation={accommodation} setAccommodation={setAccommodation} />}
+        {tab === "documents" && <DocumentsTab documents={documents} setDocuments={setDocuments} />}
       </div>
-      <div className="max-w-5xl mx-auto px-4 pb-8 text-center">
-        <button onClick={() => { if (confirm("Repor todos os dados para o estado inicial?")) { setNaipes(INITIAL_NAIPES); setRooms(INITIAL_ROOMS); } }} className="text-xs text-gray-400 hover:text-red-500">Repor dados iniciais</button>
+
+      {/* Footer */}
+      <div className="max-w-6xl mx-auto px-4 pb-8 text-center">
+        <button onClick={() => {
+          if (confirm("Repor TODOS os dados para o estado inicial? Isto apaga todas as alterações.")) {
+            setNaipes(INITIAL_NAIPES);
+            setRooms(INITIAL_ROOMS);
+            setPayments(INITIAL_PAYMENTS);
+            setAccommodation(INITIAL_ACCOMMODATION);
+            setDocuments(INITIAL_DOCUMENTS);
+          }
+        }} className="text-xs text-gray-400 hover:text-red-500">
+          Repor dados iniciais
+        </button>
       </div>
     </div>
   );
