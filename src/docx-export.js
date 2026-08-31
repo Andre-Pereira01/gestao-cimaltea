@@ -83,13 +83,14 @@ export async function exportRosterDOCX(naipes) {
     new TableRow({
       tableHeader: true,
       children: [
-        headerCell("N.º", 6),
-        headerCell("Nome", 26),
-        headerCell("Naipe", 16),
-        headerCell("DNI/CC", 14),
-        headerCell("Reforço", 8),
-        headerCell("Estado", 12),
-        headerCell("Observações", 18),
+        headerCell("N.º", 5),
+        headerCell("Nome", 22),
+        headerCell("Naipe", 14),
+        headerCell("DNI/CC", 12),
+        headerCell("Solo", 6),
+        headerCell("Reforço", 7),
+        headerCell("Estado", 10),
+        headerCell("Observações", 24),
       ],
     }),
   ];
@@ -101,13 +102,14 @@ export async function exportRosterDOCX(naipes) {
       rows.push(
         new TableRow({
           children: [
-            cell(num++, { align: AlignmentType.RIGHT, width: 6 }),
-            cell(m.name, { italic: isPend, color: isPend ? "A07800" : undefined, width: 26 }),
-            cell(n.name, { width: 16 }),
-            cell(m.dni || "", { width: 14 }),
-            cell(m.reforco ? "Sim" : "", { bold: m.reforco, color: m.reforco ? "1E64A0" : undefined, align: AlignmentType.CENTER, width: 8 }),
-            cell(isPend ? "Pendente" : "Confirmado", { italic: isPend, color: isPend ? "A07800" : undefined, width: 12 }),
-            cell(m.comments || "", { width: 18 }),
+            cell(num++, { align: AlignmentType.RIGHT, width: 5 }),
+            cell(m.name, { italic: isPend, color: isPend ? "A07800" : undefined, width: 22 }),
+            cell(n.name, { width: 14 }),
+            cell(m.dni || "", { width: 12 }),
+            cell(m.solo ? "Sim" : "", { bold: m.solo, color: m.solo ? "7B2D8E" : undefined, align: AlignmentType.CENTER, width: 6 }),
+            cell(m.reforco ? "Sim" : "", { bold: m.reforco, color: m.reforco ? "1E64A0" : undefined, align: AlignmentType.CENTER, width: 7 }),
+            cell(isPend ? "Pendente" : "Confirmado", { italic: isPend, color: isPend ? "A07800" : undefined, width: 10 }),
+            cell(m.comments || "", { width: 24 }),
           ],
         })
       );

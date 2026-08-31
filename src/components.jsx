@@ -29,7 +29,8 @@ export function Stat({ label, value, sub }) {
   );
 }
 
-export function ExportDropdown({ onPDF, onDOCX, label }) {
+export function ExportDropdown({ options, label }) {
+  // options = [{ label: "PDF", onClick: fn }, ...]
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -50,19 +51,16 @@ export function ExportDropdown({ onPDF, onDOCX, label }) {
         ↓ {label || "Exportar"} <span className="text-xs text-gray-400">▾</span>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[120px]">
-          <button
-            onClick={() => { onPDF(); setOpen(false); }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg"
-          >
-            PDF
-          </button>
-          <button
-            onClick={() => { onDOCX(); setOpen(false); }}
-            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-b-lg border-t border-gray-100"
-          >
-            Word (.docx)
-          </button>
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[140px]">
+          {options.map((opt, i) => (
+            <button
+              key={opt.label}
+              onClick={() => { opt.onClick(); setOpen(false); }}
+              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${i === 0 ? "rounded-t-lg" : ""} ${i === options.length - 1 ? "rounded-b-lg" : ""} ${i > 0 ? "border-t border-gray-100" : ""}`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       )}
     </div>

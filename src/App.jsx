@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { loadFromCloud, saveToCloud } from "./supabase.js";
 import { exportRosterPDF, exportRoomsPDF } from "./pdf-export.js";
 import { exportRosterDOCX, exportRoomsDOCX } from "./docx-export.js";
+import { exportRosterXLSX } from "./xlsx-export.js";
 import {
   uid, Badge, Stat, ExportDropdown, isOutros, getStats,
   flatMusicians, getReforcoMusicians, currency,
@@ -155,6 +156,18 @@ const INITIAL_DOCUMENTS = [
   { id: uid(), title: "Curriculum do maestro (.doc/.txt, max 1200 caracteres)", deadline: "2026-09-15", status: "pendente", comments: "" },
   { id: uid(), title: "Justificante de pagamento da fiança (600€ — CaixaBank)", deadline: "2026-05-15", status: "pendente", comments: "IBAN: ES46 2100 2611 3413 0028 5423" },
 ];
+
+const INITIAL_TRANSPORT = [];
+
+const INITIAL_BALANCE = [];
+
+// Migrate musician fields added in later versions
+function migrateMusician(m) {
+  return { dni: "", solo: false, email: "", phone: "", ...m };
+}
+function migrateNaipes(naipes) {
+  return naipes.map(n => ({ ...n, musicians: n.musicians.map(migrateMusician) }));
+}
 
 // ════════════════════════════════════════════════════════════════════
 // LOCAL STORAGE HELPERS
@@ -313,32 +326,42 @@ function LoginScreen({ onAuth }) {
 function AddMusicianInline({ onAdd, onCancel }) {
   const [name, setName] = useState("");
   const [reforco, setReforco] = useState(false);
+  const [solo, setSolo] = useState(false);
   const [status, setStatus] = useState("confirmado");
   const [comments, setComments] = useState("");
   const [dni, setDni] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const ref = useRef();
   useEffect(() => { ref.current?.focus(); }, []);
 
   const submit = () => {
     if (!name.trim()) return;
-    onAdd({ name: name.trim(), reforco, status, comments: comments.trim(), dni: dni.trim() });
-    setName(""); setReforco(false); setStatus("confirmado"); setComments(""); setDni("");
+    onAdd({ name: name.trim(), reforco, solo, status, comments: comments.trim(), dni: dni.trim(), email: email.trim(), phone: phone.trim() });
+    setName(""); setReforco(false); setSolo(false); setStatus("confirmado"); setComments(""); setDni(""); setEmail(""); setPhone("");
     ref.current?.focus();
   };
 
   return (
     <div className="px-4 py-3 bg-blue-50/50 border-t border-blue-100 space-y-2">
       <input ref={ref} className="w-full border rounded px-2 py-1 text-sm" placeholder="Nome" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
-      <div className="flex items-center gap-4 text-xs">
+      <div className="flex items-center gap-4 text-xs flex-wrap">
         <label className="flex items-center gap-1 cursor-pointer">
           <input type="checkbox" checked={reforco} onChange={e => setReforco(e.target.checked)} /> Reforço
+        </label>
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" checked={solo} onChange={e => setSolo(e.target.checked)} /> Solo
         </label>
         <select className="border rounded px-2 py-1 text-xs" value={status} onChange={e => setStatus(e.target.value)}>
           <option value="confirmado">Confirmado</option>
           <option value="pendente">Pendente</option>
         </select>
       </div>
-      <input className="w-full border rounded px-2 py-1 text-xs" placeholder="DNI / CC (opcional)" value={dni} onChange={e => setDni(e.target.value)} />
+      <div className="grid grid-cols-3 gap-2">
+        <input className="border rounded px-2 py-1 text-xs" placeholder="DNI / CC" value={dni} onChange={e => setDni(e.target.value)} />
+        <input className="border rounded px-2 py-1 text-xs" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
+        <input className="border rounded px-2 py-1 text-xs" placeholder="Telefone" value={phone} onChange={e => setPhone(e.target.value)} />
+      </div>
       <input className="w-full border rounded px-2 py-1 text-xs" placeholder="Comentários (opcional)" value={comments} onChange={e => setComments(e.target.value)} />
       <div className="flex gap-2">
         <button onClick={submit} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Adicionar</button>
@@ -351,26 +374,36 @@ function AddMusicianInline({ onAdd, onCancel }) {
 function EditMusicianInline({ m, onSave, onCancel }) {
   const [name, setName] = useState(m.name);
   const [reforco, setReforco] = useState(m.reforco);
+  const [solo, setSolo] = useState(m.solo || false);
   const [status, setStatus] = useState(m.status);
   const [comments, setComments] = useState(m.comments);
   const [dni, setDni] = useState(m.dni || "");
+  const [email, setEmail] = useState(m.email || "");
+  const [phone, setPhone] = useState(m.phone || "");
 
   return (
     <div className="space-y-1.5">
       <input className="w-full border rounded px-2 py-1 text-sm" value={name} onChange={e => setName(e.target.value)} />
-      <div className="flex items-center gap-4 text-xs">
+      <div className="flex items-center gap-4 text-xs flex-wrap">
         <label className="flex items-center gap-1 cursor-pointer">
           <input type="checkbox" checked={reforco} onChange={e => setReforco(e.target.checked)} /> Reforço
+        </label>
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input type="checkbox" checked={solo} onChange={e => setSolo(e.target.checked)} /> Solo
         </label>
         <select className="border rounded px-2 py-1 text-xs" value={status} onChange={e => setStatus(e.target.value)}>
           <option value="confirmado">Confirmado</option>
           <option value="pendente">Pendente</option>
         </select>
       </div>
-      <input className="w-full border rounded px-2 py-1 text-xs" placeholder="DNI / CC" value={dni} onChange={e => setDni(e.target.value)} />
+      <div className="grid grid-cols-3 gap-2">
+        <input className="border rounded px-2 py-1 text-xs" placeholder="DNI / CC" value={dni} onChange={e => setDni(e.target.value)} />
+        <input className="border rounded px-2 py-1 text-xs" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
+        <input className="border rounded px-2 py-1 text-xs" placeholder="Telefone" value={phone} onChange={e => setPhone(e.target.value)} />
+      </div>
       <input className="w-full border rounded px-2 py-1 text-xs" placeholder="Comentários" value={comments} onChange={e => setComments(e.target.value)} />
       <div className="flex gap-2">
-        <button onClick={() => onSave({ name: name.trim(), reforco, status, comments: comments.trim(), dni: dni.trim() })} className="text-xs bg-blue-600 text-white px-3 py-1 rounded">Guardar</button>
+        <button onClick={() => onSave({ name: name.trim(), reforco, solo, status, comments: comments.trim(), dni: dni.trim(), email: email.trim(), phone: phone.trim() })} className="text-xs bg-blue-600 text-white px-3 py-1 rounded">Guardar</button>
         <button onClick={onCancel} className="text-xs text-gray-500 px-2">Cancelar</button>
       </div>
     </div>
@@ -448,17 +481,20 @@ function RosterTab({ naipes, setNaipes }) {
   const searchLower = search.toLowerCase();
   const matchesSearch = (m) => !search || m.name.toLowerCase().includes(searchLower);
 
-  // Count DNIs filled
-  const dniCount = naipes.filter(n => !isOutros(n.name)).reduce((s, n) => s + n.musicians.filter(m => m.dni).length, 0);
+  // Count DNIs and solos filled
+  const allMusicMusicians = naipes.filter(n => !isOutros(n.name)).flatMap(n => n.musicians);
+  const dniCount = allMusicMusicians.filter(m => m.dni).length;
+  const soloCount = allMusicMusicians.filter(m => m.solo).length;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
         <Stat label="Músicos" value={stats.total} />
         <Stat label="Confirmados" value={stats.conf} />
         <Stat label="Pendentes" value={stats.pend} />
         <Stat label="Reforços" value={stats.ref} />
         <Stat label="Plantilla" value={stats.plantilla} sub="(sem reforços)" />
+        <Stat label="Solos" value={soloCount} />
         <Stat label="DNI/CC" value={`${dniCount}/${stats.total}`} sub="preenchidos" />
       </div>
 
@@ -469,10 +505,11 @@ function RosterTab({ naipes, setNaipes }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <ExportDropdown
-          onPDF={() => exportRosterPDF(naipes)}
-          onDOCX={() => exportRosterDOCX(naipes)}
-        />
+        <ExportDropdown options={[
+          { label: "PDF", onClick: () => exportRosterPDF(naipes) },
+          { label: "Word (.docx)", onClick: () => exportRosterDOCX(naipes) },
+          { label: "Excel CIMALTEA (.xlsx)", onClick: () => exportRosterXLSX(naipes) },
+        ]} />
         <button onClick={() => setShowAddNaipe(true)} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap">
           + Naipe
         </button>
@@ -532,6 +569,7 @@ function RosterTab({ naipes, setNaipes }) {
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`${m.status === "pendente" ? "text-gray-500 italic" : "text-gray-800"}`}>{m.name}</span>
                               {m.reforco && <Badge color="blue">reforço</Badge>}
+                              {m.solo && <Badge color="purple">solo</Badge>}
                               {m.status === "pendente" && <Badge color="yellow">pendente</Badge>}
                               {m.status === "confirmado" && <Badge color="green">✓</Badge>}
                               {m.dni && <span className="text-xs text-gray-400 font-mono">{m.dni}</span>}
@@ -619,10 +657,10 @@ function RoomsTab({ naipes, rooms, setRooms }) {
         ))}
         <button onClick={addRoom} className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 ml-2">+ Quarto</button>
         <div className="ml-auto">
-          <ExportDropdown
-            onPDF={() => exportRoomsPDF(naipes, rooms)}
-            onDOCX={() => exportRoomsDOCX(naipes, rooms)}
-          />
+          <ExportDropdown options={[
+            { label: "PDF", onClick: () => exportRoomsPDF(naipes, rooms) },
+            { label: "Word (.docx)", onClick: () => exportRoomsDOCX(naipes, rooms) },
+          ]} />
         </div>
       </div>
 
@@ -1293,6 +1331,457 @@ function DocumentsTab({ documents, setDocuments }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// SEPARADOR: TRANSPORTES
+// ════════════════════════════════════════════════════════════════════
+
+const TRANSPORT_TYPES = [
+  { value: "autocarro", label: "Autocarro" },
+  { value: "minibus", label: "Minibus" },
+  { value: "carrinha", label: "Carrinha / Van" },
+  { value: "misto", label: "Misto" },
+  { value: "outro_transporte", label: "Outro" },
+];
+
+const TRANSPORT_STATUS = [
+  { value: "orcamento", label: "Orçamento" },
+  { value: "contactado", label: "Contactado" },
+  { value: "reservado", label: "Reservado" },
+  { value: "confirmado", label: "Confirmado" },
+  { value: "cancelado", label: "Cancelado" },
+  { value: "descartado", label: "Descartado" },
+];
+
+function TransportTab({ transport, setTransport }) {
+  const [editing, setEditing] = useState(null);
+
+  const addOption = () => {
+    const t = {
+      id: uid(),
+      company: "",
+      type: "autocarro",
+      route: "Monção → Altea → Monção",
+      departureDate: "2026-12-03",
+      returnDate: "2026-12-06",
+      numVehicles: 1,
+      capacity: 55,
+      quotePrice: 0,
+      contactName: "",
+      contactEmail: "",
+      contactPhone: "",
+      bookingStatus: "orcamento",
+      pros: "",
+      cons: "",
+      comments: "",
+    };
+    setTransport([...transport, t]);
+    setEditing(t.id);
+  };
+
+  const updateOption = (id, field, value) => {
+    setTransport(transport.map(t => t.id === id ? { ...t, [field]: value } : t));
+  };
+
+  const removeOption = (id) => {
+    if (!confirm("Remover esta opção de transporte?")) return;
+    setTransport(transport.filter(t => t.id !== id));
+    if (editing === id) setEditing(null);
+  };
+
+  const activeOptions = transport.filter(t => !["cancelado", "descartado"].includes(t.bookingStatus));
+  const totalCapacity = activeOptions.reduce((s, t) => s + (Number(t.capacity) || 0) * (Number(t.numVehicles) || 1), 0);
+  const cheapest = activeOptions.length > 0
+    ? Math.min(...activeOptions.map(t => Number(t.quotePrice) || Infinity))
+    : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Stat label="Opções" value={transport.length} />
+        <Stat label="Ativas" value={activeOptions.length} />
+        <Stat label="Capacidade total" value={totalCapacity} sub="lugares (ativas)" />
+        <Stat label="Menor orçamento" value={cheapest === Infinity ? "—" : currency(cheapest)} />
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={addOption} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700">
+          + Opção de transporte
+        </button>
+      </div>
+
+      {transport.length === 0 && (
+        <div className="text-center text-gray-400 text-sm py-12 border border-dashed border-gray-300 rounded-lg">
+          Nenhuma opção de transporte registada.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {transport.map(t => {
+          const isEditing = editing === t.id;
+          const typeObj = TRANSPORT_TYPES.find(x => x.value === t.type);
+          const statusObj = TRANSPORT_STATUS.find(x => x.value === t.bookingStatus);
+          const statusColor = { orcamento: "gray", contactado: "yellow", reservado: "blue", confirmado: "green", cancelado: "red", descartado: "red" }[t.bookingStatus] || "gray";
+
+          return (
+            <div key={t.id} className={`border rounded-lg bg-white overflow-hidden ${["cancelado", "descartado"].includes(t.bookingStatus) ? "border-gray-100 opacity-60" : "border-gray-200"}`}>
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <span className="font-semibold text-gray-800 text-sm flex-1">
+                  {t.company || "Sem empresa"} <span className="text-gray-400 font-normal">— {typeObj?.label || t.type}</span>
+                </span>
+                {Number(t.quotePrice) > 0 && <span className="text-sm font-semibold text-gray-900">{currency(t.quotePrice)}</span>}
+                <Badge color={statusColor}>{statusObj?.label || t.bookingStatus}</Badge>
+                <button onClick={() => setEditing(isEditing ? null : t.id)} className="text-gray-400 hover:text-blue-600 text-xs px-1">{isEditing ? "▲" : "▼"}</button>
+                <button onClick={() => removeOption(t.id)} className="text-gray-400 hover:text-red-600 text-xs px-1">✕</button>
+              </div>
+
+              {isEditing && (
+                <div className="p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Empresa</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={t.company} onChange={e => updateOption(t.id, "company", e.target.value)} placeholder="Ex: Ovnitur, Iberobus" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Tipo</label>
+                      <select className="w-full border rounded px-2 py-1.5 text-sm" value={t.type} onChange={e => updateOption(t.id, "type", e.target.value)}>
+                        {TRANSPORT_TYPES.map(x => <option key={x.value} value={x.value}>{x.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Rota</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={t.route} onChange={e => updateOption(t.id, "route", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Data ida</label>
+                      <input type="date" className="w-full border rounded px-2 py-1.5 text-sm" value={t.departureDate || ""} onChange={e => updateOption(t.id, "departureDate", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Data regresso</label>
+                      <input type="date" className="w-full border rounded px-2 py-1.5 text-sm" value={t.returnDate || ""} onChange={e => updateOption(t.id, "returnDate", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">N.º veículos</label>
+                      <input type="number" min="1" className="w-full border rounded px-2 py-1.5 text-sm" value={t.numVehicles || ""} onChange={e => updateOption(t.id, "numVehicles", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Capacidade total</label>
+                      <input type="number" min="1" className="w-full border rounded px-2 py-1.5 text-sm" value={t.capacity || ""} onChange={e => updateOption(t.id, "capacity", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Orçamento total (€)</label>
+                    <input type="number" min="0" step="50" className="w-full border rounded px-2 py-1.5 text-sm" value={t.quotePrice || ""} onChange={e => updateOption(t.id, "quotePrice", e.target.value)} />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Contacto</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={t.contactName} onChange={e => updateOption(t.id, "contactName", e.target.value)} placeholder="Nome" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Email</label>
+                      <input type="email" className="w-full border rounded px-2 py-1.5 text-sm" value={t.contactEmail} onChange={e => updateOption(t.id, "contactEmail", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Telefone</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={t.contactPhone} onChange={e => updateOption(t.id, "contactPhone", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Estado</label>
+                    <select className="w-full border rounded px-2 py-1.5 text-sm" value={t.bookingStatus} onChange={e => updateOption(t.id, "bookingStatus", e.target.value)}>
+                      {TRANSPORT_STATUS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Prós</label>
+                      <textarea className="w-full border rounded px-2 py-1.5 text-sm" rows="2" value={t.pros || ""} onChange={e => updateOption(t.id, "pros", e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Contras</label>
+                      <textarea className="w-full border rounded px-2 py-1.5 text-sm" rows="2" value={t.cons || ""} onChange={e => updateOption(t.id, "cons", e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Comentários</label>
+                    <textarea className="w-full border rounded px-2 py-1.5 text-sm" rows="2" value={t.comments} onChange={e => updateOption(t.id, "comments", e.target.value)} />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SEPARADOR: BALANÇO GERAL (Receitas e Despesas)
+// ════════════════════════════════════════════════════════════════════
+
+const REVENUE_CATEGORIES = [
+  { value: "premio_cimaltea", label: "Prémio CIMALTEA (5.000€ ou 2.500€)" },
+  { value: "ajuda_distancia", label: "Ajuda distância >500km" },
+  { value: "subsidio_dgartes", label: "Subsídio DGARTES" },
+  { value: "subsidio_camara", label: "Subsídio Câmara Municipal" },
+  { value: "subsidio_junta", label: "Subsídio Junta Freguesia" },
+  { value: "subsidio_outro", label: "Outro subsídio público" },
+  { value: "quotas", label: "Quotas / Contribuição músicos" },
+  { value: "patrocinio", label: "Patrocínio" },
+  { value: "atividades", label: "Receita de atividades" },
+  { value: "outro_receita", label: "Outro" },
+];
+
+const EXPENSE_CATEGORIES = [
+  { value: "alojamento", label: "Alojamento" },
+  { value: "transporte", label: "Transporte" },
+  { value: "alimentacao", label: "Alimentação (extra)" },
+  { value: "reforcos", label: "Pagamentos a reforços" },
+  { value: "inscricao", label: "Inscrição / Fiança (600€)" },
+  { value: "partituras", label: "Partituras" },
+  { value: "seguro", label: "Seguro viagem" },
+  { value: "material", label: "Material / Equipamento" },
+  { value: "direitos_autor", label: "Direitos de autor" },
+  { value: "outro_despesa", label: "Outro" },
+];
+
+const ENTRY_STATUS = [
+  { value: "previsto", label: "Previsto" },
+  { value: "confirmado", label: "Confirmado" },
+  { value: "pago", label: "Pago / Recebido" },
+];
+
+function BalanceTab({ balance, setBalance }) {
+  const [editing, setEditing] = useState(null);
+  const [filter, setFilter] = useState("all"); // all | receita | despesa
+
+  const addEntry = (type) => {
+    const e = {
+      id: uid(),
+      type,
+      description: "",
+      amount: 0,
+      category: type === "receita" ? "outro_receita" : "outro_despesa",
+      date: new Date().toISOString().slice(0, 10),
+      status: "previsto",
+      comments: "",
+    };
+    setBalance([...balance, e]);
+    setEditing(e.id);
+  };
+
+  const updateEntry = (id, field, value) => {
+    setBalance(balance.map(e => e.id === id ? { ...e, [field]: value } : e));
+  };
+
+  const removeEntry = (id) => {
+    if (!confirm("Remover este registo?")) return;
+    setBalance(balance.filter(e => e.id !== id));
+    if (editing === id) setEditing(null);
+  };
+
+  const receitas = balance.filter(e => e.type === "receita");
+  const despesas = balance.filter(e => e.type === "despesa");
+  const totalReceitas = receitas.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const totalDespesas = despesas.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const saldo = totalReceitas - totalDespesas;
+  const confirmedReceitas = receitas.filter(e => e.status !== "previsto").reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const confirmedDespesas = despesas.filter(e => e.status !== "previsto").reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+  // Category breakdown
+  const catBreakdown = (entries, categories) => {
+    const map = {};
+    for (const e of entries) map[e.category] = (map[e.category] || 0) + (Number(e.amount) || 0);
+    return categories.map(c => ({ ...c, amount: map[c.value] || 0 })).filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
+  };
+
+  const revBreakdown = catBreakdown(receitas, REVENUE_CATEGORIES);
+  const expBreakdown = catBreakdown(despesas, EXPENSE_CATEGORIES);
+
+  const filtered = filter === "all" ? balance : balance.filter(e => e.type === filter);
+  const sorted = [...filtered].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  const allCategories = (type) => type === "receita" ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Stat label="Total receitas" value={currency(totalReceitas)} sub={`Confirmado: ${currency(confirmedReceitas)}`} />
+        <Stat label="Total despesas" value={currency(totalDespesas)} sub={`Confirmado: ${currency(confirmedDespesas)}`} />
+        <Stat label="Saldo" value={currency(saldo)} sub={saldo >= 0 ? "Positivo" : "Negativo"} />
+        <Stat label="Registos" value={balance.length} sub={`${receitas.length} rec. / ${despesas.length} desp.`} />
+      </div>
+
+      {/* Balance bar */}
+      {(totalReceitas > 0 || totalDespesas > 0) && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-xs text-emerald-600 font-medium">Receitas</span>
+            <div className="flex-1" />
+            <span className="text-xs text-rose-600 font-medium">Despesas</span>
+          </div>
+          <div className="flex h-6 rounded-full overflow-hidden bg-gray-100">
+            {totalReceitas > 0 && (
+              <div className="bg-emerald-400 h-full transition-all" style={{ width: `${(totalReceitas / (totalReceitas + totalDespesas)) * 100}%` }} />
+            )}
+            {totalDespesas > 0 && (
+              <div className="bg-rose-400 h-full transition-all" style={{ width: `${(totalDespesas / (totalReceitas + totalDespesas)) * 100}%` }} />
+            )}
+          </div>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-xs text-gray-500">{currency(totalReceitas)}</span>
+            <div className="flex-1" />
+            <span className="text-xs text-gray-500">{currency(totalDespesas)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Category charts */}
+      {(revBreakdown.length > 0 || expBreakdown.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {revBreakdown.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <p className="text-xs font-medium text-gray-600 mb-3">Receitas por categoria</p>
+              <div className="space-y-1.5">
+                {revBreakdown.map(c => {
+                  const maxVal = revBreakdown[0]?.amount || 1;
+                  return (
+                    <div key={c.value} className="flex items-center gap-2 text-xs">
+                      <span className="w-36 text-right text-gray-600 truncate" title={c.label}>{c.label}</span>
+                      <div className="flex-1 bg-gray-100 rounded h-4 overflow-hidden">
+                        <div className="bg-emerald-400 h-4 rounded transition-all" style={{ width: `${(c.amount / maxVal) * 100}%` }} />
+                      </div>
+                      <span className="w-20 text-right font-mono text-gray-700">{currency(c.amount)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {expBreakdown.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              <p className="text-xs font-medium text-gray-600 mb-3">Despesas por categoria</p>
+              <div className="space-y-1.5">
+                {expBreakdown.map(c => {
+                  const maxVal = expBreakdown[0]?.amount || 1;
+                  return (
+                    <div key={c.value} className="flex items-center gap-2 text-xs">
+                      <span className="w-36 text-right text-gray-600 truncate" title={c.label}>{c.label}</span>
+                      <div className="flex-1 bg-gray-100 rounded h-4 overflow-hidden">
+                        <div className="bg-rose-400 h-4 rounded transition-all" style={{ width: `${(c.amount / maxVal) * 100}%` }} />
+                      </div>
+                      <span className="w-20 text-right font-mono text-gray-700">{currency(c.amount)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Action buttons and filter */}
+      <div className="flex gap-2 items-center flex-wrap">
+        <button onClick={() => addEntry("receita")} className="bg-emerald-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-emerald-700">
+          + Receita
+        </button>
+        <button onClick={() => addEntry("despesa")} className="bg-rose-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-rose-700">
+          + Despesa
+        </button>
+        <div className="ml-auto flex gap-1">
+          {[{ v: "all", l: "Todos" }, { v: "receita", l: "Receitas" }, { v: "despesa", l: "Despesas" }].map(f => (
+            <button key={f.v} onClick={() => setFilter(f.v)} className={`text-xs px-3 py-1.5 rounded-lg border ${filter === f.v ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"}`}>{f.l}</button>
+          ))}
+        </div>
+      </div>
+
+      {balance.length === 0 && (
+        <div className="text-center text-gray-400 text-sm py-12 border border-dashed border-gray-300 rounded-lg">
+          Nenhum registo financeiro. Adiciona receitas e despesas para visualizar o balanço.
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {sorted.map(e => {
+          const isEditing = editing === e.id;
+          const isReceita = e.type === "receita";
+          const cats = allCategories(e.type);
+          const catObj = cats.find(c => c.value === e.category);
+          const statusObj = ENTRY_STATUS.find(s => s.value === e.status);
+          const statusColor = e.status === "pago" ? "green" : e.status === "confirmado" ? "blue" : "gray";
+
+          return (
+            <div key={e.id} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3">
+                <div className={`w-2 h-8 rounded-full flex-shrink-0 ${isReceita ? "bg-emerald-400" : "bg-rose-400"}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-gray-800 font-medium">{e.description || catObj?.label || "Sem descrição"}</span>
+                    <span className="text-xs text-gray-400">{catObj?.label}</span>
+                  </div>
+                  {e.date && <span className="text-xs text-gray-400">{new Date(e.date).toLocaleDateString("pt-PT")}</span>}
+                </div>
+                <span className={`text-sm font-semibold ${isReceita ? "text-emerald-700" : "text-rose-700"}`}>
+                  {isReceita ? "+" : "−"}{currency(Number(e.amount) || 0).replace(" €", "")} €
+                </span>
+                <Badge color={statusColor}>{statusObj?.label || e.status}</Badge>
+                <button onClick={() => setEditing(isEditing ? null : e.id)} className="text-gray-400 hover:text-blue-600 text-xs px-1">{isEditing ? "▲" : "▼"}</button>
+                <button onClick={() => removeEntry(e.id)} className="text-gray-400 hover:text-red-600 text-xs px-1">✕</button>
+              </div>
+
+              {isEditing && (
+                <div className="px-4 pb-3 space-y-2 border-t border-gray-100 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Descrição</label>
+                      <input className="w-full border rounded px-2 py-1.5 text-sm" value={e.description} onChange={ev => updateEntry(e.id, "description", ev.target.value)} placeholder="Descrição..." />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Categoria</label>
+                      <select className="w-full border rounded px-2 py-1.5 text-sm" value={e.category} onChange={ev => updateEntry(e.id, "category", ev.target.value)}>
+                        {cats.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Valor (€)</label>
+                      <input type="number" min="0" step="10" className="w-full border rounded px-2 py-1.5 text-sm" value={e.amount || ""} onChange={ev => updateEntry(e.id, "amount", ev.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Data</label>
+                      <input type="date" className="w-full border rounded px-2 py-1.5 text-sm" value={e.date || ""} onChange={ev => updateEntry(e.id, "date", ev.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Estado</label>
+                      <select className="w-full border rounded px-2 py-1.5 text-sm" value={e.status} onChange={ev => updateEntry(e.id, "status", ev.target.value)}>
+                        {ENTRY_STATUS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Comentários</label>
+                    <textarea className="w-full border rounded px-2 py-1.5 text-xs" rows="2" value={e.comments} onChange={ev => updateEntry(e.id, "comments", ev.target.value)} />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
 // CLOUD SYNC HOOK
 // ════════════════════════════════════════════════════════════════════
 
@@ -1317,6 +1806,8 @@ export default function App() {
   const [rooms, setRooms] = useState(null);
   const [payments, setPayments] = useState(null);
   const [accommodation, setAccommodation] = useState(null);
+  const [transport, setTransport] = useState(null);
+  const [balance, setBalance] = useState(null);
   const [documents, setDocuments] = useState(null);
   const [tab, setTab] = useState("roster");
   const [syncStatus, setSyncStatus] = useState("loading");
@@ -1326,44 +1817,38 @@ export default function App() {
     if (!authenticated) return;
     (async () => {
       setSyncStatus("loading");
-      const cloudNaipesResult = await loadFromCloud("naipes");
-      const cloudRoomsResult = await loadFromCloud("rooms");
-      const cloudPaymentsResult = await loadFromCloud("payments");
-      const cloudAccommodationResult = await loadFromCloud("accommodation");
-      const cloudDocumentsResult = await loadFromCloud("documents");
-      const cloudNaipes = cloudNaipesResult.ok && !cloudNaipesResult.notFound ? cloudNaipesResult.data : null;
-      const cloudRooms = cloudRoomsResult.ok && !cloudRoomsResult.notFound ? cloudRoomsResult.data : null;
-      const cloudPayments = cloudPaymentsResult.ok && !cloudPaymentsResult.notFound ? cloudPaymentsResult.data : null;
-      const cloudAccommodation = cloudAccommodationResult.ok && !cloudAccommodationResult.notFound ? cloudAccommodationResult.data : null;
-      const cloudDocuments = cloudDocumentsResult.ok && !cloudDocumentsResult.notFound ? cloudDocumentsResult.data : null;
+      const cloudNaipes = await loadFromCloud("naipes");
+      const cloudRooms = await loadFromCloud("rooms");
+      const cloudPayments = await loadFromCloud("payments");
+      const cloudAccommodation = await loadFromCloud("accommodation");
+      const cloudTransport = await loadFromCloud("transport");
+      const cloudBalance = await loadFromCloud("balance");
+      const cloudDocuments = await loadFromCloud("documents");
 
       if (cloudNaipes) {
-        // Migrate: ensure all musicians have dni field
-        const migratedNaipes = cloudNaipes.map(n => ({
-          ...n,
-          musicians: n.musicians.map(m => ({ dni: "", ...m })),
-        }));
+        const migratedNaipes = migrateNaipes(cloudNaipes);
         setNaipes(migratedNaipes);
         setRooms(cloudRooms || []);
         setPayments(cloudPayments || []);
         setAccommodation(cloudAccommodation || []);
+        setTransport(cloudTransport || []);
+        setBalance(cloudBalance || []);
         setDocuments(cloudDocuments || INITIAL_DOCUMENTS);
         saveLocal("cimaltea-naipes", migratedNaipes);
         saveLocal("cimaltea-rooms", cloudRooms || []);
         saveLocal("cimaltea-payments", cloudPayments || []);
         saveLocal("cimaltea-accommodation", cloudAccommodation || []);
+        saveLocal("cimaltea-transport", cloudTransport || []);
+        saveLocal("cimaltea-balance", cloudBalance || []);
         saveLocal("cimaltea-documents", cloudDocuments || INITIAL_DOCUMENTS);
         setSyncStatus("cloud");
       } else {
-        const localNaipes = loadLocal("cimaltea-naipes", INITIAL_NAIPES);
-        const migratedLocal = localNaipes.map(n => ({
-          ...n,
-          musicians: n.musicians.map(m => ({ dni: "", ...m })),
-        }));
-        setNaipes(migratedLocal);
+        setNaipes(migrateNaipes(loadLocal("cimaltea-naipes", INITIAL_NAIPES)));
         setRooms(loadLocal("cimaltea-rooms", INITIAL_ROOMS));
         setPayments(loadLocal("cimaltea-payments", INITIAL_PAYMENTS));
         setAccommodation(loadLocal("cimaltea-accommodation", INITIAL_ACCOMMODATION));
+        setTransport(loadLocal("cimaltea-transport", INITIAL_TRANSPORT));
+        setBalance(loadLocal("cimaltea-balance", INITIAL_BALANCE));
         setDocuments(loadLocal("cimaltea-documents", INITIAL_DOCUMENTS));
         setSyncStatus("local");
       }
@@ -1375,6 +1860,8 @@ export default function App() {
   useCloudSync("rooms", rooms);
   useCloudSync("payments", payments);
   useCloudSync("accommodation", accommodation);
+  useCloudSync("transport", transport);
+  useCloudSync("balance", balance);
   useCloudSync("documents", documents);
 
   // ── Auth gate ──
@@ -1382,7 +1869,7 @@ export default function App() {
     return <LoginScreen onAuth={() => setAuthenticated(true)} />;
   }
 
-  if (!naipes || !rooms || !payments || !accommodation || !documents) {
+  if (!naipes || !rooms || !payments || !accommodation || !transport || !balance || !documents) {
     return <div className="flex items-center justify-center h-screen text-gray-400">A carregar...</div>;
   }
 
@@ -1393,6 +1880,8 @@ export default function App() {
     { id: "rooms", label: "Quartos" },
     { id: "payments", label: "Pagamentos" },
     { id: "accommodation", label: "Estadia" },
+    { id: "transport", label: "Transportes" },
+    { id: "balance", label: "Balanço" },
     { id: "documents", label: "Documentação" },
   ];
 
@@ -1439,6 +1928,8 @@ export default function App() {
         {tab === "rooms" && <RoomsTab naipes={naipes} rooms={rooms} setRooms={setRooms} />}
         {tab === "payments" && <PaymentsTab naipes={naipes} payments={payments} setPayments={setPayments} />}
         {tab === "accommodation" && <AccommodationTab accommodation={accommodation} setAccommodation={setAccommodation} />}
+        {tab === "transport" && <TransportTab transport={transport} setTransport={setTransport} />}
+        {tab === "balance" && <BalanceTab balance={balance} setBalance={setBalance} />}
         {tab === "documents" && <DocumentsTab documents={documents} setDocuments={setDocuments} />}
       </div>
 
@@ -1450,6 +1941,8 @@ export default function App() {
             setRooms(INITIAL_ROOMS);
             setPayments(INITIAL_PAYMENTS);
             setAccommodation(INITIAL_ACCOMMODATION);
+            setTransport(INITIAL_TRANSPORT);
+            setBalance(INITIAL_BALANCE);
             setDocuments(INITIAL_DOCUMENTS);
           }
         }} className="text-xs text-gray-400 hover:text-red-500">

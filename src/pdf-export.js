@@ -62,6 +62,7 @@ export function exportRosterPDF(naipes) {
         m.name,
         n.name,
         m.dni || "",
+        m.solo ? "Sim" : "",
         m.reforco ? "Sim" : "",
         m.status === "confirmado" ? "Confirmado" : "Pendente",
         m.comments || "",
@@ -71,28 +72,34 @@ export function exportRosterPDF(naipes) {
 
   autoTable(doc, {
     startY: y,
-    head: [["N.º", "Nome", "Naipe", "DNI/CC", "Reforço", "Estado", "Observações"]],
+    head: [["N.º", "Nome", "Naipe", "DNI/CC", "Solo", "Reforço", "Estado", "Observações"]],
     body: rows,
-    styles: { fontSize: 8, cellPadding: 1.5 },
-    headStyles: { fillColor: [41, 65, 107], fontStyle: "bold", fontSize: 8 },
+    styles: { fontSize: 7, cellPadding: 1.2 },
+    headStyles: { fillColor: [41, 65, 107], fontStyle: "bold", fontSize: 7 },
     columnStyles: {
-      0: { cellWidth: 10, halign: "right" },
-      1: { cellWidth: 38 },
-      2: { cellWidth: 24 },
-      3: { cellWidth: 22 },
-      4: { cellWidth: 12, halign: "center" },
-      5: { cellWidth: 18 },
-      6: { cellWidth: 48 },
+      0: { cellWidth: 8, halign: "right" },
+      1: { cellWidth: 36 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 20 },
+      4: { cellWidth: 10, halign: "center" },
+      5: { cellWidth: 12, halign: "center" },
+      6: { cellWidth: 16 },
+      7: { cellWidth: 48 },
     },
     didParseCell: (data) => {
       if (data.section === "body") {
-        const status = data.row.raw[5];
+        const status = data.row.raw[6];
         if (status === "Pendente") {
           data.cell.styles.textColor = [160, 120, 0];
           data.cell.styles.fontStyle = "italic";
         }
-        const reforco = data.row.raw[4];
-        if (reforco === "Sim" && data.column.index === 4) {
+        const solo = data.row.raw[4];
+        if (solo === "Sim" && data.column.index === 4) {
+          data.cell.styles.textColor = [123, 45, 142];
+          data.cell.styles.fontStyle = "bold";
+        }
+        const reforco = data.row.raw[5];
+        if (reforco === "Sim" && data.column.index === 5) {
           data.cell.styles.textColor = [30, 100, 160];
           data.cell.styles.fontStyle = "bold";
         }
