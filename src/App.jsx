@@ -1825,31 +1825,51 @@ export default function App() {
       const cloudBalance = await loadFromCloud("balance");
       const cloudDocuments = await loadFromCloud("documents");
 
-      if (cloudNaipes) {
-        const migratedNaipes = migrateNaipes(cloudNaipes);
+      const hasCloudData =
+        cloudNaipes.ok &&
+        !cloudNaipes.notFound &&
+        Array.isArray(cloudNaipes.data);
+
+      if (hasCloudData) {
+        const migratedNaipes = migrateNaipes(cloudNaipes.data);
+        const roomsData = Array.isArray(cloudRooms.data) ? cloudRooms.data : [];
+        const paymentsData = Array.isArray(cloudPayments.data) ? cloudPayments.data : [];
+        const accommodationData = Array.isArray(cloudAccommodation.data) ? cloudAccommodation.data : [];
+        const transportData = Array.isArray(cloudTransport.data) ? cloudTransport.data : [];
+        const balanceData = Array.isArray(cloudBalance.data) ? cloudBalance.data : [];
+        const documentsData = Array.isArray(cloudDocuments.data) ? cloudDocuments.data : INITIAL_DOCUMENTS;
+
         setNaipes(migratedNaipes);
-        setRooms(cloudRooms || []);
-        setPayments(cloudPayments || []);
-        setAccommodation(cloudAccommodation || []);
-        setTransport(cloudTransport || []);
-        setBalance(cloudBalance || []);
-        setDocuments(cloudDocuments || INITIAL_DOCUMENTS);
+        setRooms(roomsData);
+        setPayments(paymentsData);
+        setAccommodation(accommodationData);
+        setTransport(transportData);
+        setBalance(balanceData);
+        setDocuments(documentsData);
         saveLocal("cimaltea-naipes", migratedNaipes);
-        saveLocal("cimaltea-rooms", cloudRooms || []);
-        saveLocal("cimaltea-payments", cloudPayments || []);
-        saveLocal("cimaltea-accommodation", cloudAccommodation || []);
-        saveLocal("cimaltea-transport", cloudTransport || []);
-        saveLocal("cimaltea-balance", cloudBalance || []);
-        saveLocal("cimaltea-documents", cloudDocuments || INITIAL_DOCUMENTS);
+        saveLocal("cimaltea-rooms", roomsData);
+        saveLocal("cimaltea-payments", paymentsData);
+        saveLocal("cimaltea-accommodation", accommodationData);
+        saveLocal("cimaltea-transport", transportData);
+        saveLocal("cimaltea-balance", balanceData);
+        saveLocal("cimaltea-documents", documentsData);
         setSyncStatus("cloud");
       } else {
-        setNaipes(migrateNaipes(loadLocal("cimaltea-naipes", INITIAL_NAIPES)));
-        setRooms(loadLocal("cimaltea-rooms", INITIAL_ROOMS));
-        setPayments(loadLocal("cimaltea-payments", INITIAL_PAYMENTS));
-        setAccommodation(loadLocal("cimaltea-accommodation", INITIAL_ACCOMMODATION));
-        setTransport(loadLocal("cimaltea-transport", INITIAL_TRANSPORT));
-        setBalance(loadLocal("cimaltea-balance", INITIAL_BALANCE));
-        setDocuments(loadLocal("cimaltea-documents", INITIAL_DOCUMENTS));
+        const localNaipes = loadLocal("cimaltea-naipes", INITIAL_NAIPES);
+        const localRooms = loadLocal("cimaltea-rooms", INITIAL_ROOMS);
+        const localPayments = loadLocal("cimaltea-payments", INITIAL_PAYMENTS);
+        const localAccommodation = loadLocal("cimaltea-accommodation", INITIAL_ACCOMMODATION);
+        const localTransport = loadLocal("cimaltea-transport", INITIAL_TRANSPORT);
+        const localBalance = loadLocal("cimaltea-balance", INITIAL_BALANCE);
+        const localDocuments = loadLocal("cimaltea-documents", INITIAL_DOCUMENTS);
+
+        setNaipes(migrateNaipes(localNaipes));
+        setRooms(localRooms);
+        setPayments(localPayments);
+        setAccommodation(localAccommodation);
+        setTransport(localTransport);
+        setBalance(localBalance);
+        setDocuments(localDocuments);
         setSyncStatus("local");
       }
     })();
