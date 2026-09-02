@@ -665,10 +665,10 @@ function RoomsTab({ naipes, rooms, setRooms }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 lg:sticky lg:top-4 self-start">
           <div className="border border-gray-200 rounded-lg bg-white">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 font-semibold text-sm text-gray-700">Por atribuir ({unassigned.length})</div>
-            <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
+            <div className="max-h-[calc(100vh-8rem)] overflow-y-auto divide-y divide-gray-100">
               {unassigned.map(m => (
                 <div key={m.id} className={`px-4 py-2 text-sm cursor-pointer hover:bg-blue-50 flex items-center gap-2 ${selectedMusician === m.id ? "bg-blue-100" : ""}`} onClick={() => setSelectedMusician(selectedMusician === m.id ? null : m.id)}>
                   <span className="text-gray-400 text-xs font-mono w-6 text-right">{m.globalNum}</span>
